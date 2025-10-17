@@ -145,11 +145,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-
-# Usuário está logado - Redireciona para dashboard
-# (Substitui: window.location.href = '../../index.html')
-
 st.markdown(f"""
 <div style='text-align: center; padding: 50px;'>
     <h2 style='color: #1ED760;'>Entre na sua conta:</h2>
@@ -160,12 +155,11 @@ st.markdown(f"""
 col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
     if st.button("🎵 Login", use_container_width=True):
-        # Se você tem múltiplas páginas, use:
         st.switch_page("pages/spotify.py")
         st.info("Clique para ir ao dashboard (configure as páginas)")
     
 
-# Auto-redirect após 2 segundos (opcional)
+# Auto-redirect após 2 segundos
 st.markdown("""
 <script>
     setTimeout(function() {
