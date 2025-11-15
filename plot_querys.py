@@ -1,8 +1,8 @@
-import app
 import streamlit as st
 import altair as alt
 import pandas as pd
 import plotly.express as px
+import queries as q
 from db import run_query
 
 #--------------------------------------------
@@ -10,7 +10,7 @@ from db import run_query
 #--------------------------------------------
 def plot_top5_musicas_geral():
     try:
-        df_top_musicas = app.get_top5_musicas_geral()
+        df_top_musicas = q.get_top5_musicas_geral()
     except Exception as e:
         st.error(f"Erro ao buscar os dados do banco de dados: {e}")
         df_top_musicas = pd.DataFrame()
@@ -80,7 +80,7 @@ def plot_top5_musicas_geral():
 def plot_info_artista():
 # --- 1. DESTAQUES GERAIS DA CATEGORIA ---
     st.subheader("Destaques da Categoria")
-    df_mais_seguidores = app.get_art_mais_seguidores()
+    df_mais_seguidores = q.get_art_mais_seguidores()
     if not df_mais_seguidores.empty:
         artista_nome = df_mais_seguidores.iloc[0]['nome']
         seguidores = df_mais_seguidores.iloc[0]['total_seguidores']
@@ -118,7 +118,7 @@ def plot_info_artista():
     # Métrica: Top 3 Músicas
     with col_metric_1:
         st.markdown("<h5>Top 3 Músicas Mais Ouvidas</h5>", unsafe_allow_html=True)
-        df_top3_musicas = app.get_top3_musicas_art(id_artista)  # Usando a função corrigida
+        df_top3_musicas = q.get_top3_musicas_art(id_artista)  # Usando a função corrigida
 
         if not df_top3_musicas.empty:
             # 1. Criar uma string formatada para a lista
@@ -142,7 +142,7 @@ def plot_info_artista():
     # Métrica: Álbum Mais Salvo
     with col_metric_2:
         st.markdown("<h5>Álbum Mais Salvo</h5>", unsafe_allow_html=True)
-        df_album_salvo = app.get_album_mais_salvo_do_artista(id_artista)
+        df_album_salvo = q.get_album_mais_salvo_do_artista(id_artista)
         if not df_album_salvo.empty:
             album_nome = df_album_salvo.iloc[0]['nome_do_album']
             salvos = df_album_salvo.iloc[0]['total_de_vezes_salvo']
@@ -271,3 +271,35 @@ def plot_info_artista():
 #--------------------------------------------
 #-------------------USUARIO------------------
 #--------------------------------------------
+
+def plot_total_musicas(user_id_logado):
+    df_total_musicas = q.get_total_musicas_usuario(user_id_logado)
+    total_musicas = df_total_musicas.iloc[0]['total_musicas'] if not df_total_musicas.empty else 0
+    
+    st.metric("Total de Músicas Ouvidas", total_musicas)
+
+def plot_tempo_total_escutado(user_id_logado):
+    total_segundos = q.get_tempo_total_escutado_segundos(user_id_logado)
+    if total_segundos is None:
+        total_segundos = 0
+
+    total_minutos = total_segundos // 60
+
+    horas = total_minutos // 60
+
+    minutos = total_minutos % 60
+
+    st.metric("Horas ouvindo", f"{horas}h {minutos}m")
+
+def plot_artista_favorito(user_id_logado):
+    # Métrica 3: Artista Favorito
+    df_art_fav = q.get_top1_art_ouvido(user_id_logado)
+    artista_fav = df_art_fav.iloc[0]['nome'] if not df_art_fav.empty else "N/A"
+    
+    st.metric("Artistas favoritos", artista_fav)
+
+def plot_genero_preferido(user_id_logado):
+    # Métrica 2: Gênero de Álbum Favorito
+    df_gen_album = q.get_genero_album_ouvido(user_id_logado)
+    genero_album_pref = df_gen_album.iloc[0]['genero'] if not df_gen_album.empty else "N/A"
+    st.metric("Gênero Preferido", genero_album_pref)
