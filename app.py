@@ -87,51 +87,37 @@ st.markdown("<h1 class='main-title'>Dashboard para análise Spotify</h1>", unsaf
 col1, col2, col3 = st.columns([1, 1, 1])
 
 with col2:
-
-    # st.image("images\logo_spotify.svg", width=200)
-
+    #st.image("assets\images\logo_spotify.svg", width=200)
     st.markdown("<p class='image-label'>Um dashboard sobre uma aplicação análoga ao Spotify</p>", unsafe_allow_html=True)
 
-
-
 # Sistema de Tabs
-
 tab1, tab2, tab3 = st.tabs(["📊 Visão Geral", "🎤 Análise Artistas", "👤 Análise do Usuário"])
 
 
-
 # TAB 1: Visão Geral
-
 with tab1:
-
     st.markdown("<div class='content-box'>", unsafe_allow_html=True)
-
     st.header("📊 Visão Geral")
-
     st.subheader("Aqui ficarão os gráficos da Visão Geral")
 
     # Placeholder para gráficos
-
-    col1, col2 = st.columns(2)
-
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
-
-        st.info("🎵 Total de músicas: 1.234")
-        st.info("👥 Total de artistas: 456")
-
-        st.subheader("TOP 5 músicas mais reproduzidas: 🎧")
-
+        st.subheader("TOP 5 Músicas Mais Reproduzidas: 🎧")
         pq.plot_top5_musicas_geral()
 
     with col2:
+        st.subheader("TOP 10 Álbuns com Mais Faixas 💿")
+        pq.plot_top_10_albuns()
 
-        st.info("📀 Total de álbuns: 789")
-        st.info("⏱️ Total de podcasts: 45h 23min")
-
-   
+    with col3:
+        st.subheader("TOP 5 Álbuns Mais Salvos pelos Usuários ⭐")
+        pq.plot_top_5_albuns_salvos()
+        st.subheader("TOP 5 Podcasts Mais Seguidos 📈")
+        pq.plot_top_5_podcasts_seguidos()
 
     # Conteúdo placeholder
-
     with st.expander("Ver mais detalhes"):
         for i in range(5):
             st.write(f"Informação detalhada {i+1}")

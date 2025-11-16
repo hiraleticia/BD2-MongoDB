@@ -4,18 +4,6 @@ import pandas as pd
 import plotly.express as px
 from db import run_query
 
-def get_art_mais_5albuns():
-    """Nomes dos artistas que possuem mais de 5 albuns publicados"""
-    query = """
-    SELECT Conta.nome FROM Conta, Artista, Conteudo, Album
-    WHERE Conta.id = Artista.id_do_artista
-        AND Artista.id_do_artista = Conteudo.id_do_artista
-        AND Conteudo.id = Album.id_album
-        GROUP BY Conta.nome
-        	HAVING COUNT(Album.id_album) > 5;"""
-
-    return run_query(query)
-
 # ------ TAB ARTISTA ------
 def get_top3_musicas_art(id_do_artista):
     # Top 3 músicas mais ouvidas de um artista
@@ -129,19 +117,6 @@ def get_top5_podcast_seguidos():
         GROUP BY Conteudo.nome
             ORDER BY total_seguidores DESC
             LIMIT 5;'''
-
-    return run_query(query)
-
-
-def get_art_5album():
-    # Nomes dos artistas que possuem mais de 5 albuns publicados
-    query = """
-    SELECT Conta.nome FROM Conta, Artista, Conteudo, Album
-    WHERE Conta.id = Artista.id_do_artista
-        AND Artista.id_do_artista = Conteudo.id_do_artista
-        AND Conteudo.id = Album.id_album
-        GROUP BY Conta.nome
-        	HAVING COUNT(Album.id_album) > 5;"""
 
     return run_query(query)
 
