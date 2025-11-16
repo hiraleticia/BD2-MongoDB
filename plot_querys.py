@@ -68,6 +68,137 @@ def plot_top5_musicas_geral():
         st.info("Nenhum dado encontrado para as Top 5 músicas.")
    
 
+def plot_top_10_albuns():
+    try:
+        df_top_albuns = q.get_top_10_albuns_com_mais_faixas()
+    except Exception as e:
+        st.error(f"Erro ao carregar os dados dos álbuns: {e}")
+        df_top_albuns = pd.DataFrame()
+
+    if not df_top_albuns.empty:
+        df_top_albuns = df_top_albuns.sort_values(by='total_de_musicas', ascending=False)
+
+        # Criar o Gráfico de Barras com Altair
+        chart = alt.Chart(df_top_albuns).mark_bar().encode(
+
+            # Eixo X: Total de Músicas
+            x=alt.X('total_de_musicas',
+                    title='Total de Músicas (Faixas)',
+                    axis=alt.Axis(format='d')
+            ),
+
+            # Eixo Y: Nome do Álbum
+            y=alt.Y('nome',
+                    title='Nome do Álbum',
+                    sort='-x' # Ordena as barras do maior para o menor valor de x
+            ),
+
+            color=alt.value("#66A3FF"), # Cor azul fixa para todas as barras
+
+            # Tooltip para exibir detalhes
+            tooltip=[
+                alt.Tooltip('nome', title='Álbum'),
+                alt.Tooltip('total_de_musicas', title='Nº de Faixas', format='d')
+            ]
+        ).properties(
+            height=400
+        ).interactive()
+
+        st.altair_chart(chart, use_container_width=True)
+
+    else:
+        st.info("Nenhum álbum encontrado para o ranking Top 10.")
+
+def plot_top_5_albuns_salvos():
+    try:
+        df_top_albuns_salvos = q.get_top5_albuns_salvos()
+    except Exception as e:
+        st.error(f"Erro ao carregar os dados dos álbuns salvos: {e}")
+        df_top_albuns_salvos = pd.DataFrame()
+
+    if not df_top_albuns_salvos.empty:
+        # 2. Ordenar o DataFrame
+        df_top_albuns_salvos = df_top_albuns_salvos.sort_values(by='total_salvos', ascending=False)
+
+        # 3. Criar o Gráfico de Barras com Altair
+        chart = alt.Chart(df_top_albuns_salvos).mark_bar().encode(
+
+            # Eixo X (Comprimento da Barra): Total de Salvamentos
+            x=alt.X('total_salvos',
+                    title='Total de Salvamentos',
+                    # Formato com separador de milhar
+                    axis=alt.Axis(format=',')
+            ),
+
+            # Eixo Y (Cada Barra): Nome do Álbum
+            y=alt.Y('nome',
+                    title='Nome do Álbum',
+                    sort='-x' # Garante que o álbum com mais salvamentos fique no topo
+            ),
+
+            # Cor: Cor fixa ou usar a própria métrica como cor (intensidade)
+            color=alt.value("#FF66B2"), # Cor rosa para destaque (pode ser qualquer cor)
+
+            # Tooltip para exibir detalhes
+            tooltip=[
+                alt.Tooltip('nome', title='Álbum'),
+                alt.Tooltip('total_salvos', title='Total de Salvamentos', format=',')
+            ]
+        ).properties(
+            height=300
+        ).interactive()
+
+        # 4. Exibir o gráfico no Streamlit
+        st.altair_chart(chart, use_container_width=True)
+
+    else:
+        st.info("Nenhum dado de álbum salvo encontrado.")
+
+def plot_top_5_podcasts_seguidos():
+    try:
+        df_top_podcasts = q.get_top5_podcast_seguidos()
+    except Exception as e:
+        st.error(f"Erro ao carregar os dados dos podcasts: {e}")
+        df_top_podcasts = pd.DataFrame()
+
+    if not df_top_podcasts.empty:
+        # 2. Ordenar o DataFrame (opcional, pois o SQL já ordena, mas garante a consistência)
+        df_top_podcasts = df_top_podcasts.sort_values(by='total_seguidores', ascending=False)
+
+        # 3. Criar o Gráfico de Barras com Altair
+        chart = alt.Chart(df_top_podcasts).mark_bar().encode(
+
+            # Eixo X (Comprimento da Barra): Total de Seguidores
+            x=alt.X('total_seguidores',
+                    title='Total de Seguidores',
+                    # Formato com separador de milhar para melhor leitura
+                    axis=alt.Axis(format=',')
+            ),
+
+            # Eixo Y (Cada Barra): Nome do Podcast
+            y=alt.Y('nome',
+                    title='Nome do Podcast',
+                    sort='-x' # Garante que o podcast mais seguido fique no topo
+            ),
+
+            # Cor: Definida como um valor fixo
+            color=alt.value("#9B59B6"), # Uma cor roxa para destaque (pode ser ajustada)
+
+            # Tooltip para exibir detalhes
+            tooltip=[
+                alt.Tooltip('nome', title='Podcast'),
+                alt.Tooltip('total_seguidores', title='Total de Seguidores', format=',')
+            ]
+        ).properties(
+            height=300
+        ).interactive()
+
+        # 4. Exibir o gráfico no Streamlit
+        st.altair_chart(chart, use_container_width=True)
+
+    else:
+        st.info("Nenhum dado de podcast seguido encontrado.")
+
 
 #--------------------------------------------
 #-------------------ARTISTA------------------
