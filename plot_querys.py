@@ -244,6 +244,21 @@ def plot_top_5_podcasts_seguidos():
             height=300,
             background='transparent'
         ).interactive()
+        chart = chart.configure_view(
+            # Fundo da área do gráfico transparente
+            fill='transparent',
+            strokeWidth=0  # Remove a borda da visualização
+        ).configure_axis(
+            # Cor do texto e dos eixos
+            domainColor='#FFFFFF',  # Cor da linha do eixo (ex: Y)
+            gridColor='#555555',  # Cor das linhas de grade (ex: X)
+            labelColor='#FFFFFF',  # Cor dos rótulos (ex: nomes das músicas)
+            titleColor='#FFFFFF'  # Cor dos títulos dos eixos (ex: "Música")
+        ).configure_legend(
+            # Cor da legenda
+            labelColor='#FFFFFF',
+            titleColor='#FFFFFF'
+        )
 
         # 4. Exibir o gráfico no Streamlit
         st.altair_chart(chart, use_container_width=True)
@@ -269,8 +284,10 @@ def plot_artista_mais_seguido():
 def plot_artista_mais_mus_publi():
     df_mais_music_publicada = q.get_art_mais_mus_publi()
     artista_music_publicada = df_mais_music_publicada.iloc[0]['nome_artista']
+    num_musicas = df_mais_music_publicada.iloc[0]['numero_musicas']
     st.metric(label="Artista com mais músicas publicadas",
-              value=artista_music_publicada)
+              value=artista_music_publicada,
+              delta=f"{num_musicas} músicas")
 
 
 def plot_info_artista():
@@ -362,7 +379,7 @@ def plot_info_artista():
             st.subheader(f'Músicas escutadas do álbum "{album_escolhido}" ')
             df_musicas = q.get_song_plays_by_album(id_album)
             if df_musicas.empty:
-                st.warning("Nenhuma reprodução registrada para este álbum.")
+                st.info("Este álbum não possui nenhum ouvinte.")
             else:
                 fig = px.pie(
                     df_musicas,
@@ -469,7 +486,15 @@ def plot_tempo_total_escutado(user_id_logado):
 def plot_artista_favorito(user_id_logado):
     df_art_fav = q.get_top1_art_ouvido(user_id_logado)
     artista_fav = df_art_fav.iloc[0]['nome'] if not df_art_fav.empty else "N/A"
-    st.metric("Artista favorito", artista_fav)
+
+    st.markdown("**Artista favorito**")
+
+    # Valor (o nome da música) com fonte menor (ex: 20px)
+    st.markdown(f"""
+        <p style='font-size: 20px; color: #FFFFFF; margin-top: -10px;'>
+            {artista_fav}
+        </p>
+        """, unsafe_allow_html=True)
 
 def plot_genero_musica_preferido(user_id_logado): ###### ALTERAR
     df_gen_album = q.get_genero_musica_ouvida(user_id_logado)
@@ -489,6 +514,89 @@ def plot_musica_favorita(user_id_logado):
         </p>
         """, unsafe_allow_html=True)
 
+def plot_top5_genero_musicas_ouvidas(user_id):
+    df_top5_generos = q.get_top5_genero_musicas_ouvidas(user_id)
+    if df_top5_generos.empty:
+        st.info(f"O usuário com ID {user_id} não possui dados suficientes de reprodução de música para gerar o gráfico.")
+    else:
+        fig_pie_genero = px.pie(
+            df_top5_generos,
+            names="genero",                
+            values="reproducoes_totais",   
+            title="Distribuição dos 5 Gêneros Mais Ouvidos",
+            hole=0.5,                       
+            color_discrete_sequence=["#5DB7E4", "#1335BD", "#A51D2F", "#C98D44", '#007050'] 
+        )
+
+        # 3. Aplicar o tema escuro/transparente 
+        fig_pie_genero.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',  
+            font_color='#FFFFFF',
+            legend_font_color='#FFFFFF',
+            title_font_color='#FFFFFF',
+            legend=dict(
+                orientation="v",            # Orientação vertical (padrão)
+                x=0.01,                     # Move a legenda para a esquerda (próximo à borda)
+                y=0.5,                      # Centraliza verticalmente
+                xanchor="left",             # Alinha o lado esquerdo da legenda em x
+                yanchor="middle",           # Alinha o meio da legenda em y
+                bgcolor='rgba(0,0,0,0)'     # Garante que o fundo da legenda seja transparente
+            )
+        )
+
+        fig_pie_genero.update_traces(
+            textinfo='percent+label', 
+            textfont_color='#FFFFFF', 
+            marker=dict(line=dict(color='#000000', width=1)) 
+        )
+
+        st.plotly_chart(fig_pie_genero, use_container_width=True)
+
+def plot_top5_artistas_ouvidos(user_id_logado):
+    df_top5 = q.get_top5_artistas_ouvidos(user_id_logado)
+
+    if not df_top5.empty:
+        df_top5 = df_top5.reset_index()
+
+        fig_bar = px.bar(
+            df_top5,
+            x="reproducoes_totais",
+            y="nome",
+            orientation='h',  # Gráfico horizontal
+            title="Top 5 artistas mais ouvidos",
+            labels={'nome': 'Artista', 'reproducoes_totais': 'Reproduções'},
+            text='reproducoes_totais',
+        )
+
+        fig_bar.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            title_font_color='#FFFFFF',
+            font_color='#FFFFFF',
+            
+            xaxis=dict(
+                tickfont=dict(color='#FFFFFF'), # Cor dos valores (ticks) do eixo X
+                title=dict(font=dict(color='#FFFFFF')), # Cor do título do eixo X ("Reproduções")
+                gridcolor='rgba(255, 255, 255, 0.2)' # Cor da linha de grade (opcional: cinza claro/transparente)
+            ),
+            yaxis=dict(
+                categoryorder='total ascending',
+                tickfont=dict(color='#FFFFFF'), # Cor dos valores (ticks) do eixo Y (nomes)
+                title=dict(font=dict(color='#FFFFFF')) # Cor do título do eixo Y ("Artista")
+            )
+        )
+
+        # Estilizar as barras
+        fig_bar.update_traces(
+            textposition='outside',
+            marker_color="#1E5CD7", 
+            textfont_color='#FFFFFF'
+        )
+
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.info("Você ainda não possui um ranking de artistas.")
 
 def plot_top5_musicas_usuario(user_id_logado):
     df_top5 = q.get_top5_musicas_ouvidas(user_id_logado)
@@ -511,14 +619,26 @@ def plot_top5_musicas_usuario(user_id_logado):
             plot_bgcolor='rgba(0,0,0,0)',
             title_font_color='#FFFFFF',
             font_color='#FFFFFF',
-            yaxis={'categoryorder': 'total ascending'}  # Ordena do maior para o menor
+            
+            xaxis=dict(
+                tickfont=dict(color='#FFFFFF'), # Cor dos valores (ticks) do eixo X
+                title=dict(font=dict(color='#FFFFFF')), # Cor do título do eixo X ("Reproduções")
+                gridcolor='rgba(255, 255, 255, 0.2)' # Cor da linha de grade (opcional: cinza claro/transparente)
+            ),
+            yaxis=dict(
+                categoryorder='total ascending',
+                tickfont=dict(color='#FFFFFF'), # Cor dos valores (ticks) do eixo Y (nomes)
+                title=dict(font=dict(color='#FFFFFF')) # Cor do título do eixo Y ("Artista")
+            )
         )
 
         # Estilizar as barras
         fig_bar.update_traces(
             textposition='outside',
-            marker_color='#1ED760'  # Verde Spotify
+            marker_color='#1ED760',  # Verde Spotify
+            textfont_color='#FFFFFF'
         )
+        
 
         st.plotly_chart(fig_bar, use_container_width=True)
     else:

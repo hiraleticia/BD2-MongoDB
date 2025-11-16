@@ -1,4 +1,8 @@
+#.vscode/*
 .idea
 .vscode
 .env
 *venv*
+
+# Cache
+*__pychache__*

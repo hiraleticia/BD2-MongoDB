@@ -118,11 +118,6 @@ with tab1:
         st.subheader("Top 5 podcasts mais seguidos 📈")
         pq.plot_top_5_podcasts_seguidos()
 
-    # Conteúdo placeholder
-    with st.expander("Ver mais detalhes"):
-        for i in range(5):
-            st.write(f"Informação detalhada {i+1}")
-
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -174,6 +169,12 @@ with tab3:
     st.subheader("📈 Análise de estatísticas")
     with st.expander("Ver estatísticas detalhadas"):
         pq.plot_top5_musicas_usuario(user_id_logado)
+
+        col1, col2 =st.columns(2)
+        with col1:
+            pq.plot_top5_genero_musicas_ouvidas(user_id_logado)
+        with col2:    
+            pq.plot_top5_artistas_ouvidos(user_id_logado)
 
     st.markdown("</div>", unsafe_allow_html=True)
 

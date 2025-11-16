@@ -57,7 +57,7 @@ def get_album_mais_salvo_do_artista(id_do_artista):
 
 
 def check_artist_type(id_artista):
-    #Verifica se um artista tem conteúdo de podcast ou de álbum.
+    # Verifica se um artista tem conteúdo de podcast ou de álbum.
     query_podcast = """
         SELECT EXISTS (
             SELECT 1
@@ -253,7 +253,8 @@ def get_top5_podcast_seguidos():
 def get_art_mais_mus_publi():
     # Artista com o maior número de músicas publicadas
     query = '''
-    SELECT MIN(Conta.nome) AS nome_artista
+    SELECT Conta.nome AS nome_artista,
+    COUNT(Musica.id_da_musica) AS numero_musicas
     FROM Artista, Conta, Conteudo, Album, Musica
     WHERE Artista.id_do_artista = Conta.id
         AND Conteudo.id_do_artista = Artista.id_do_artista
@@ -341,6 +342,19 @@ def get_genero_musica_ouvida(user_id):
         LIMIT 1;'''
     return run_query(query, (user_id,))
 
+def get_top5_genero_musicas_ouvidas(user_id):
+    # Gênero de album mais ouvido pelo usuário
+    query = '''
+    SELECT Musica.genero, 
+    SUM(EscutaMusica.numero_reproducoes) AS reproducoes_totais
+        FROM EscutaMusica 
+        JOIN Musica ON EscutaMusica.id_da_musica = Musica.id_da_musica
+        WHERE EscutaMusica.id_da_conta = %s
+        GROUP BY Musica.genero
+        ORDER BY reproducoes_totais DESC
+        LIMIT 5;'''
+    return run_query(query, (user_id,))
+
 
 def get_genero_podcast_ouvido(user_id):
     # Gênero de podcast mais ouvido pelo usuário
@@ -364,6 +378,45 @@ def get_total_musicas_usuario(user_id):
         FROM escutamusica
             WHERE id_da_conta = %s;"""
     return run_query(query, (user_id,))
+
+def get_top5_artistas_ouvidos(user_id):
+    query = '''
+        WITH ReproducoesMusica AS ( 
+            -- Calcula o total de reproduções de músicas por Artista para o usuário
+            SELECT Conteudo.id_do_artista, 
+            SUM(EscutaMusica.numero_reproducoes) AS total_reproducoes 
+                FROM EscutaMusica 
+                JOIN Musica ON EscutaMusica.id_da_musica = Musica.id_da_musica
+                JOIN Album ON Musica.id_album = Album.id_album 
+                JOIN Conteudo ON Album.id_album = Conteudo.id 
+                WHERE EscutaMusica.id_da_conta = %s
+                GROUP BY Conteudo.id_do_artista 
+            ),
+            ReproducoesEpisodio AS ( 
+            -- Calcula o total de reproduções de episódios por Artista para o usuário
+            SELECT Conteudo.id_do_artista, 
+            SUM(EscutaEpisodio.numero_reproducoes) AS total_reproducoes
+                FROM EscutaEpisodio 
+                JOIN Episodio ON EscutaEpisodio.id_episodio = Episodio.id_episodio 
+                JOIN Podcast ON Episodio.id_podcast = Podcast.id_podcast 
+                JOIN Conteudo ON Podcast.id_podcast = Conteudo.id 
+                WHERE EscutaEpisodio.id_da_conta = %s 
+                    GROUP BY Conteudo.id_do_artista 
+            )
+            -- Une os resultados e busca o artista com a maior contagem
+            SELECT Conta.nome, 
+            SUM(TabelaTemp.total_reproducoes) AS reproducoes_totais
+                FROM ( 
+                    SELECT id_do_artista, total_reproducoes FROM ReproducoesMusica
+                    UNION ALL 
+                    SELECT id_do_artista, total_reproducoes FROM ReproducoesEpisodio 
+                ) AS TabelaTemp
+                    JOIN Artista ON TabelaTemp.id_do_artista = Artista.id_do_artista 
+                    JOIN Conta ON Artista.id_do_artista = Conta.id
+                    GROUP BY Conta.nome
+                    ORDER BY reproducoes_totais DESC 
+                    LIMIT 5;'''
+    return run_query(query, (user_id, user_id))
 
 def get_top5_musicas_ouvidas(user_id):
     query = '''
