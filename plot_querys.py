@@ -517,7 +517,7 @@ def plot_musica_favorita(user_id_logado):
 def plot_top5_genero_musicas_ouvidas(user_id):
     df_top5_generos = q.get_top5_genero_musicas_ouvidas(user_id)
     if df_top5_generos.empty:
-        st.info(f"O usuário com ID {user_id} não possui dados suficientes de reprodução de música para gerar o gráfico.")
+        st.info(f"O usuário não possui dados suficientes de reprodução de música para gerar o gráfico.")
     else:
         fig_pie_genero = px.pie(
             df_top5_generos,
