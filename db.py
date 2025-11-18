@@ -3,6 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 import sqlalchemy
+from sqlalchemy.pool import NullPool
 
 @st.cache_resource
 def init_connection():
@@ -15,7 +16,7 @@ def init_connection():
         )
 
         # 2. Criar um engine do SQLAlchemy
-        engine = sqlalchemy.create_engine(db_url)
+        engine = sqlalchemy.create_engine(db_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
         return engine  # Retorna o engine
 
     except Exception as e:
@@ -24,14 +25,35 @@ def init_connection():
 
 @st.cache_data(ttl=3600)
 def run_query(query, params=None):
+    engine = init_connection()
+    if engine is None:
+        st.error("Não foi possível conectar ao banco de dados.")
+        return pd.DataFrame()
+    
+    # Usa uma conexão isolada para cada query
+    connection = None
     try:
-        # Pega o engine cacheado
-        engine = init_connection()
-
         # 3. pd.read_sql funciona nativamente com o engine do SQLAlchemy
         # Isso elimina o UserWarning
-        df = pd.read_sql(query, engine, params=params)
+        connection = engine.connect()
+        df = pd.read_sql(query, connection, params=params)
         return df
+
     except Exception as e:
+        # Rollback em caso de erro
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+
         st.error(f"Erro na query: {e}")
         return pd.DataFrame()
+    
+    finally:
+        # Sempre fecha a conexão
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
