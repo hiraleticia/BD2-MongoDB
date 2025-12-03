@@ -3,7 +3,6 @@ import altair as alt
 import pandas as pd
 import plotly.express as px
 import queries as q
-from db import run_query
 
 #--------------------------------------------
 #--------------------GERAL-------------------

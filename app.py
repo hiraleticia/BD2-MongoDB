@@ -1,10 +1,7 @@
 import streamlit as st
 import altair as alt
-import psycopg2
-import plotly.express as px
 from dotenv import load_dotenv
 import os
-from db import run_query
 import plot_querys as pq
 
 # ----------------------------------------
