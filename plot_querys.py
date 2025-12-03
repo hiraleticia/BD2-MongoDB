@@ -315,11 +315,17 @@ def plot_info_artista():
         with col_metric_1:
             st.markdown("<h5>Top 3 Músicas Mais Ouvidas</h5>", unsafe_allow_html=True)
             df_top3_musicas = q.get_top3_musicas_art(id_artista)
-            if not df_top3_musicas.empty:
+            if hasattr(df_top3_musicas, 'to_dict'):
+                dados_top3 = df_top3_musicas.to_dict('records')
+            else:
+                dados_top3 = list(df_top3_musicas)
+            if dados_top3:
                 lista_musicas_formatada = ""
-                for index, row in df_top3_musicas.reset_index().iterrows():
-                    plays_text = "reprodução" if row['numero_reproducoes'] == 1 else "reproduções"
-                    lista_musicas_formatada += f"{index + 1}. **{row['nome']}** ({row['numero_reproducoes']} {plays_text})\n"
+                for index, musica in enumerate(dados_top3):
+                    n_reproducoes = musica['numero_reproducoes']
+                    nome_musica = musica['nome']
+                    plays_text = "reprodução" if n_reproducoes == 1 else "reproduções"
+                    lista_musicas_formatada += f"{index + 1}. **{nome_musica}** ({n_reproducoes} {plays_text})\n"
                 st.markdown(lista_musicas_formatada)
             else:
                 st.info("Este artista não possui músicas em ranking.")
@@ -405,12 +411,17 @@ def plot_info_artista():
         with col_metric_1:
             st.markdown("<h5>Top 3 Episódios Mais Ouvidos</h5>", unsafe_allow_html=True)
             df_top3_episodios = q.get_top3_episodios_podcaster(id_artista)
-
-            if not df_top3_episodios.empty:
+            if hasattr(df_top3_episodios, 'to_dict'):
+                dados_top3 = df_top3_episodios.to_dict('records')
+            else:
+                dados_top3 = list(df_top3_episodios)
+            if dados_top3:
                 lista_episodios_formatada = ""
-                for index, row in df_top3_episodios.reset_index().iterrows():
-                    plays_text = "reprodução" if row['numero_reproducoes'] == 1 else "reproduções"
-                    lista_episodios_formatada += f"{index + 1}. **{row['nome']}** ({row['numero_reproducoes']} {plays_text})\n"
+                for index, episodio in enumerate(dados_top3):
+                    n_reproducoes = episodio['numero_reproducoes']
+                    nome_episodio = episodio['nome']
+                    plays_text = "reprodução" if n_reproducoes == 1 else "reproduções"
+                    lista_episodios_formatada += f"{index + 1}. **{nome_episodio}** ({n_reproducoes} {plays_text})\n"
                 st.markdown(lista_episodios_formatada)
             else:
                 st.info("Este podcaster não possui episódios em ranking.")

@@ -3,8 +3,38 @@ from db import run_query
 
 # ------------ TAB ARTISTA --------------
 def get_top3_musicas_art(id_do_artista):
-
-    return run_query()
+    pipeline = [
+        {"$match": {"conteudo.idDoArtista": id_do_artista}},
+        {"$unwind": "$musicas"},
+        {"$lookup":
+             {"from": "usuario",
+              "let": {"musicaId": "$musicas.idDaMusica"},
+              "pipeline": [{"$unwind": "$conta.musicasOuvidas"},
+                           {"$match": {"$expr": {"$eq": ["$conta.musicasOuvidas.idDaMusica", "$$musicaId"]}}},
+                           {"$project": {"_id": 0, "numeroReproducoes": "$conta.musicasOuvidas.numeroReproducoes"}}],
+              "as": "reproducoesUsuario"}},
+        {"$lookup":
+             {"from": "artista",
+              "let": {"musicaId": "$musicas.idDaMusica"},
+              "pipeline": [{"$unwind": "$conta.musicasOuvidas"},
+                           {"$match": {"$expr": {"$eq": ["$conta.musicasOuvidas.idDaMusica", "$$musicaId"]}}},
+                           {"$project": {"_id": 0, "numeroReproducoes": "$conta.musicasOuvidas.numeroReproducoes"}}],
+              "as": "reproducoesArtista"}},
+        {"$group":
+             {"_id": "$musicas.idDaMusica",
+              "nome": {"$first": "$musicas.nome"},
+              "totalReproducoesUsuario": {"$sum": {"$sum": "$reproducoesUsuario.numeroReproducoes"}},
+              "totalReproducoesArtista": {"$sum": {"$sum": "$reproducoesArtista.numeroReproducoes"}}}},
+        {"$project":
+             {"nome": 1,
+              "numero_reproducoes": {"$add": ["$totalReproducoesUsuario", "$totalReproducoesArtista"]},
+              "_id": 0}
+        },
+        {"$match": {"numero_reproducoes": {"$gt": 0}}},
+        {"$sort": {"numero_reproducoes": -1}},
+        {"$limit": 3}
+    ]
+    return run_query("album", "aggregate", pipeline)
 
 
 def get_art_mais_seguidores():
@@ -58,20 +88,20 @@ def get_album_mais_salvo_do_artista(id_do_artista):
         }},
         
         { "$addFields": {
-            "totalSaves": { "$arrayElemAt": ["$contagemDeSaves.count", 0] }
+            "total_de_vezes_salvo": { "$arrayElemAt": ["$contagemDeSaves.count", 0] }
         }},
         
         { "$match": {
-            "totalSaves": { "$gt": 0 }
+            "total_de_vezes_salvo": { "$gt": 0 }
         }},
         
         { "$project": {
             "_id": 0,
-            "nomeAlbum": "$conteudo.nome",
-            "totalSaves": 1
+            "nome_do_album": "$conteudo.nome",
+            "total_de_vezes_salvo": 1
         }},
         
-        { "$sort": { "totalSaves": -1 } },
+        { "$sort": { "total_de_vezes_salvo": -1 } },
         
         { "$limit": 1 }
     ]
@@ -79,14 +109,35 @@ def get_album_mais_salvo_do_artista(id_do_artista):
 
 
 def check_artist_type(id_artista):
-    # Verifica se é podcaster
-    df_podcast = run_query('podcast', 'find_one', {"conteudo.idDoArtista": id_artista}, {"_id": 1})
+    """
+        Verifica se o ID fornecido possui documentos nas coleções de podcast ou álbum.
+        """
 
+    # 1. Tratamento de Tipo:
+    # Baseado nas imagens, os IDs são salvos como Números (Int) no banco.
+    # Se o id_artista vier como string ("10"), precisamos converter para int (10).
+    try:
+        id_busca = int(id_artista)
+    except ValueError:
+        id_busca = id_artista
+
+    # 2. Definição do Filtro e Projeção
+    # O caminho "conteudo.idDoArtista" foi identificado na imagem do álbum.
+    query_filter = {"conteudo.idDoArtista": id_busca}
+    projection = {"_id": 1}  # Traz apenas o ID para economizar memória (equivale ao SELECT 1)
+
+    # ---------------------------------------------------------
+    # 3. Verifica PODCAST
+    # Passamos coleção, operação, filtro e projeção
+    df_podcast = run_query("podcast", "find_one", query_filter, projection)
+
+    # Usamos .empty porque o run_query retorna um DataFrame
     if not df_podcast.empty:
         return 'podcaster'
 
-    # Verifica se é músico
-    df_album = run_query('album', 'find_one', {"conteudo.idDoArtista": id_artista}, {"_id": 1})
+    # ---------------------------------------------------------
+    # 4. Verifica ÁLBUM
+    df_album = run_query("album", "find_one", query_filter, projection)
 
     if not df_album.empty:
         return 'musico'
@@ -150,7 +201,7 @@ def get_top3_episodios_podcaster(id_artista):
             "_id": "$podcastInfo.episodios.idEpisodio",
             "nomeArtista": { "$first": "$conta.nome" },
             "nomePodcast": { "$first": "$podcastInfo.conteudo.nome" },
-            "nomeEpisodio": { "$first": "$podcastInfo.episodios.nome" },
+            "nome": { "$first": "$podcastInfo.episodios.nome" },
             "idEpisodio": { "$first": "$podcastInfo.episodios.idEpisodio" },
             "totalReproducoesUsuario": {
                 "$sum": { "$sum": "$reproducoesUsuario.numeroReproducoes" }
@@ -163,24 +214,22 @@ def get_top3_episodios_podcaster(id_artista):
         { "$project": {
             "nomeArtista": 1,
             "nomePodcast": 1,
-            "nomeEpisodio": 1,
+            "nome": 1,
             "idEpisodio": "$_id",
-            "totalReproducoes": { 
+            "numero_reproducoes": {
                 "$add": ["$totalReproducoesUsuario", "$totalReproducoesArtista"] 
             }
         }},
         
-        { "$sort": { "totalReproducoes": -1 } },
+        { "$sort": { "numero_reproducoes": -1 } },
         
         { "$limit": 3 },
         
         { "$project": {
             "_id": 0,
-            "nomeArtista": 1,
-            "nomePodcast": 1,
-            "nomeEpisodio": 1,
+            "nome": 1,
             "idEpisodio": 1,
-            "totalReproducoes": 1
+            "numero_reproducoes": 1
         }}
     ]    
     return run_query("artista", "aggregate", pipeline)
@@ -238,7 +287,7 @@ def get_seguidores_podcast_artista(id_artista):
             "_id": 0,
             "nomeArtista": "$conta.nome",
             "nomePodcast": "$podcastInfo.conteudo.nome",
-            "totalSeguidores": { 
+            "total_seguidores": {
                 "$add": [
                     { "$size": "$seguidoresUsuarios" },
                     { "$size": "$seguidoresArtistas" }
@@ -248,7 +297,7 @@ def get_seguidores_podcast_artista(id_artista):
             "seguidoresArtistas": { "$size": "$seguidoresArtistas" }
         }},
         
-        { "$sort": { "totalSeguidores": -1 } }
+        { "$sort": { "total_seguidores": -1 } }
     ] 
     return run_query("artista", "aggregate", pipeline)
 
@@ -307,8 +356,8 @@ def get_all_episode_plays_by_artist(id_artista):
             "_id": "$podcastInfo.episodios.idEpisodio",
             "nomeArtista": { "$first": "$conta.nome" },
             "nomePodcast": { "$first": "$podcastInfo.conteudo.nome" },
-            "nomeEpisodio": { "$first": "$podcastInfo.episodios.nome" },
-            "totalReproducoes": {
+            "nome": { "$first": "$podcastInfo.episodios.nome" },
+            "numero_reproducoes": {
                 "$sum": { 
                     "$add": [
                         { "$sum": "$reproducoesArtistas.numeroReproducoes" },
@@ -318,14 +367,14 @@ def get_all_episode_plays_by_artist(id_artista):
             }
         }},
         
-        { "$sort": { "totalReproducoes": -1 } },
+        { "$sort": { "numero_reproducoes": -1 } },
         
         { "$project": {
             "_id": 0,
             "nomeArtista": 1,
             "nomePodcast": 1,
-            "nomeEpisodio": 1,
-            "totalReproducoes": 1
+            "nome": 1,
+            "numero_reproducoes": 1
         }}
     ] 
     return run_query("artista", "aggregate", pipeline)
@@ -336,7 +385,6 @@ def get_all_artists():
     pipeline = [
         {
             "$project": {
-                "idDoArtista": 1,
                 "id_do_artista": "$idDoArtista",
                 "nome": "$conta.nome",
                 "_id": 0
@@ -386,7 +434,8 @@ def get_albums_by_artist(id_artista):
         
         { "$project": {
             "_id": 0,
-            "nomeAlbum": "$albumInfo.conteudo.nome"
+            "id_album": "$albumInfo.idAlbum",
+            "nome_album": "$albumInfo.conteudo.nome"
         }}
     ]
     return run_query("artista", "aggregate", pipeline)
@@ -427,20 +476,20 @@ def get_song_plays_by_album(id_album):
         
         { "$group": {
             "_id": "$musicas.idDaMusica",
-            "nomeMusica": { "$first": "$musicas.nome" },
-            "totalReproducoes": {
+            "musica": { "$first": "$musicas.nome" },
+            "reproducoes": {
                 "$sum": { 
                     "$ifNull": ["$usuariosQueOuviram.conta.musicasOuvidas.numeroReproducoes", 0] 
                 }
             }
         }},
         
-        { "$sort": { "totalReproducoes": -1 } },
+        { "$sort": { "reproducoes": -1 } },
         
         { "$project": {
             "_id": 0,
-            "nomeMusica": 1,
-            "totalReproducoes": 1
+            "musica": 1,
+            "reproducoes": 1
         }}
     ]
     return run_query("album", "aggregate", pipeline)
@@ -712,8 +761,14 @@ def get_top1_musica_ouvida(user_id):
 
 
 def get_top1_art_ouvido(user_id):
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
     pipeline = [
-        {"$match": {"idDaConta": user_id}},
+        {"$match": {campo_id: user_id}},
 
         # Processar músicas e episódios em paralelo
         {
@@ -805,23 +860,23 @@ def get_top1_art_ouvido(user_id):
         }
     ]
 
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_genero_musica_ouvida(user_id):
     """
     Gênero de música mais ouvido
     Funciona para usuário OU artista
     """
-    #tipo = check_account_type(user_id)
+    tipo = check_account_type(user_id)
 
-    #if tipo == 'desconhecido':
-       # return pd.DataFrame({'genero': ['N/A']})
+    if tipo == 'desconhecido':
+        return pd.DataFrame({'genero': ['N/A']})
 
-    #colecao = "usuario" if tipo == 'usuario' else "artista"
-    #campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
 
     pipeline = [
-        {"$match": {"idDaConta": user_id}},
+        {"$match": {campo_id: user_id}},
         {"$unwind": "$conta.musicasOuvidas"},
 
         {
@@ -856,15 +911,22 @@ def get_genero_musica_ouvida(user_id):
         }
     ]
 
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 
 def get_top5_genero_musicas_ouvidas(user_id):
     """
     Top 5 gêneros de música mais ouvidos
     """
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
     pipeline = [
-        {"$match": {"idDaConta": user_id}},
+        {"$match": {campo_id: user_id}},
         {"$unwind": "$conta.musicasOuvidas"},
 
         {
@@ -900,7 +962,7 @@ def get_top5_genero_musicas_ouvidas(user_id):
         }
     ]
 
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_total_musicas_usuario(user_id):
     #Retorna o total de músicas diferentes que o usuário já ouviu.
@@ -922,8 +984,14 @@ def get_top5_artistas_ouvidos(user_id):
     """
     Top 5 artistas mais ouvidos (músicas + podcasts)
     """
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
     pipeline = [
-        {"$match": {"idDaConta": user_id}},
+        {"$match": {campo_id: user_id}},
 
         {
             "$facet": {
@@ -1008,7 +1076,7 @@ def get_top5_artistas_ouvidos(user_id):
             }
         }
     ]
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_top5_musicas_ouvidas(user_id):
     pipeline = [
@@ -1052,8 +1120,15 @@ def get_top5_musicas_ouvidas(user_id):
     return run_query("usuario", "aggregate", pipeline)
 
 def get_tempo_total_escutado_segundos(user_id):
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return 0
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
     pipeline = [
-        {"$match":{"idDaConta":user_id}},
+        {"$match":{campo_id:user_id}},
         {"$unwind":"$conta.musicasOuvidas"},
         {"$lookup":
         {
@@ -1075,7 +1150,7 @@ def get_tempo_total_escutado_segundos(user_id):
         {"$project":{"_id":0,"tempoTotalMS":1,"total_segundos":{"$divide":["$tempoTotalMS",1000]}}}
     ]
 
-    df = run_query("usuario","aggregate", pipeline)
+    df = run_query(colecao,"aggregate", pipeline)
 
 
     # Tratamento de erro / vazio

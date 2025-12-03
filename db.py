@@ -88,8 +88,8 @@ def run_query(collection_name, operation, *args, **kwargs):
                 df = pd.DataFrame(list(result))
 
         # Remove o campo _id se existir
-        if '_id' in df.columns:
-            df = df.drop('_id', axis=1)
+        #if '_id' in df.columns:
+            #df = df.drop('_id', axis=1)
 
         return df
 
