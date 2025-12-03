@@ -39,8 +39,10 @@ if st.session_state.logged_in:
     st.switch_page("app.py") 
 
 # Função de login (chama ao clicar no botão)
+
+
 def do_login():
-    """Lida com a lógica de login e redireciona para a Home Page."""
+    """Lida com a lógica de login verificando as coleções de Usuário e Artista."""
 
     username_input = st.session_state.input_username.strip()
 
@@ -48,35 +50,46 @@ def do_login():
         st.error("Por favor, digite seu nome de usuário.")
         return
 
-    # 1. PREPARA A QUERY PARA VALIDAR O USUÁRIO
-    query = """
-        SELECT id, nome_de_usuario 
-        FROM Conta 
-        WHERE nome_de_usuario = %s;
-    """
+    # Procura dentro do objeto 'conta' pelo campo 'nomeDeUsuario'
+    query_filter = {"conta.nomeDeUsuario": username_input}
 
-    # 2. EXECUTA A QUERY
-    # Passamos o nome de usuário como uma tupla (parâmetro)
     try:
-        df_user = run_query(query, (username_input,))
+        # --- TENTATIVA 1: Verificar na coleção 'usuario' ---
+        df_usuario = run_query("usuario", "find_one", query_filter)
+
+        if not df_usuario.empty:
+            user_data = df_usuario.iloc[0]
+            conta_info = user_data['conta']
+            st.session_state.username = conta_info['nomeDeUsuario']
+            st.session_state.user_id = int(user_data['idDaConta'])
+            st.session_state.user_type = 'usuario'  # Útil para lógica futura
+            st.session_state.logged_in = True
+            st.switch_page("app.py")
+            return
+
+        # --- TENTATIVA 2: Verificar na coleção 'artista' ---
+        # Se não achou em usuário, procura em artista
+        df_artista = run_query("artista", "find_one", query_filter)
+
+        if not df_artista.empty:
+            artist_data = df_artista.iloc[0]
+
+            conta_info = artist_data['conta']
+            st.session_state.username = conta_info['nomeDeUsuario']
+            st.session_state.user_id = int(artist_data['idDoArtista'])
+            st.session_state.user_type = 'artista'
+            st.session_state.logged_in = True
+
+            st.switch_page("app.py")
+            return
+
     except Exception as e:
-        st.error(f"Erro ao verificar usuário")
+        st.error(f"Erro ao processar login: {e}")
         return
 
-    # 3. VERIFICA O RESULTADO
-    if df_user.empty:
-        # Usuário NÃO encontrado
-        st.error("Usuário não encontrado. Verifique o nome de usuário.")
-        st.session_state.logged_in = False
-    else:
-        # Usuário ENCONTRADO
-        # Armazena as informações do usuário na sessão
-        st.session_state.username = df_user.iloc[0]['nome_de_usuario']
-        st.session_state.user_id = int(df_user.iloc[0]['id'])
-        st.session_state.logged_in = True
-
-        # 4. Redireciona para a página principal
-        st.switch_page("app.py")
+    # Se chegou aqui, não achou em nenhuma das duas coleções
+    st.error("Usuário não encontrado. Verifique o nome de usuário.")
+    st.session_state.logged_in = False
 
 # CSS personalizado (Mantenha o CSS do seu login.py aqui)
 st.markdown("""
