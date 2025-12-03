@@ -188,3 +188,23 @@ footer {
 [data-testid="stSelectbox"] input::placeholder {
     color: #888888 !important; /* Texto cinza */
 }
+
+/* ========================================================================= */
+/* 6. Ocultar Completamente a Barra Lateral e Navegação */
+/* ========================================================================= */
+
+/* 1. Esconde a lista de páginas (App, Login, etc.) */
+[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+/* 2. Esconde o container principal da barra lateral */
+[data-testid="stSidebar"] {
+    display: none !important;
+    width: 0px !important;
+}
+
+/* 3. Esconde o botão de abrir/fechar a barra lateral (a setinha >) */
+[data-testid="collapsedControl"] {
+    display: none !important;
+}

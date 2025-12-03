@@ -2,58 +2,97 @@ import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
 import os
-import sqlalchemy
-from sqlalchemy.pool import NullPool
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, OperationFailure
 
 @st.cache_resource
 def init_connection():
     load_dotenv()
     try:
-        # 1. Construir a string de conexão (URI) para o SQLAlchemy
-        db_url = (
-            f"postgresql+psycopg2://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-            f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-        )
+        uri = os.getenv("MONGODB_URI")
+        if not uri:
+            st.error("A variável MONGODB_URI não foi encontrada no .env")
+            return None
 
-        # 2. Criar um engine do SQLAlchemy
-        engine = sqlalchemy.create_engine(db_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
-        return engine  # Retorna o engine
+        client = MongoClient(uri)
+
+        # Teste rápido de conexão (ping)
+        client.admin.command('ping')
+        return client
 
     except Exception as e:
-        st.error(f"Erro na conexão com SQLAlchemy: {e}")
+        st.error(f"Erro na conexão com MongoDB: {e}")
         return None
 
+def get_database():
+    """Retorna o database do MongoDB"""
+    client = init_connection()
+    if client is None:
+        return None
+
+    db_name = os.getenv('DB_NAME')
+    return client[db_name]
+
 @st.cache_data(ttl=3600)
-def run_query(query, params=None):
-    engine = init_connection()
-    if engine is None:
+def run_query(collection_name, operation, *args, **kwargs):
+    db = get_database()
+    if db is None:
         st.error("Não foi possível conectar ao banco de dados.")
         return pd.DataFrame()
-    
-    # Usa uma conexão isolada para cada query
-    connection = None
+
     try:
-        # 3. pd.read_sql funciona nativamente com o engine do SQLAlchemy
-        # Isso elimina o UserWarning
-        connection = engine.connect()
-        df = pd.read_sql(query, connection, params=params)
+        collection = db[collection_name]
+        # Obtém o método da coleção dinamicamente
+        if not hasattr(collection, operation):
+            st.error(f"Operação '{operation}' não existe na coleção MongoDB")
+            return pd.DataFrame()
+
+        method = getattr(collection, operation)
+
+        # Executa a operação
+        result = method(*args, **kwargs)
+
+        # Processa o resultado baseado no tipo de operação
+        if operation == 'aggregate':
+            # Aggregate retorna um cursor
+            df = pd.DataFrame(list(result))
+
+        elif operation == 'find':
+            # Find retorna um cursor
+            df = pd.DataFrame(list(result))
+
+        elif operation == 'find_one':
+            # Find_one retorna um documento único
+            if result:
+                df = pd.DataFrame([result])
+            else:
+                df = pd.DataFrame()
+
+        elif operation == 'count_documents':
+            # Count retorna um número
+            df = pd.DataFrame({'total': [result]})
+
+        elif operation == 'distinct':
+            # Distinct retorna uma lista
+            df = pd.DataFrame({args[0]: result})
+
+        else:
+            # Tenta converter o resultado para DataFrame
+            if isinstance(result, (list, tuple)):
+                df = pd.DataFrame(result)
+            elif isinstance(result, dict):
+                df = pd.DataFrame([result])
+            elif isinstance(result, (int, float, str)):
+                df = pd.DataFrame({'result': [result]})
+            else:
+                df = pd.DataFrame(list(result))
+
+        # Remove o campo _id se existir
+        if '_id' in df.columns:
+            df = df.drop('_id', axis=1)
+
         return df
 
     except Exception as e:
-        # Rollback em caso de erro
-        if connection:
-            try:
-                connection.rollback()
-            except:
-                pass
-
-        st.error(f"Erro na query: {e}")
+        st.error(f"Erro na execução da query MongoDB: {e}")
         return pd.DataFrame()
-    
-    finally:
-        # Sempre fecha a conexão
-        if connection:
-            try:
-                connection.close()
-            except:
-                pass
