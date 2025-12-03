@@ -8,8 +8,25 @@ def get_top3_musicas_art(id_do_artista):
 
 
 def get_art_mais_seguidores():
-    
-    return run_query()
+    pipeline = [
+        {
+            "$project": {
+                "nome": "$conta.nome",
+                "total_seguidores": {
+                    "$size": { "$ifNull": ["$conta.seguidores", []] }
+                }
+            }
+        },
+        { "$sort": {"totalSeguidores": -1}},
+        { "$limit": 1},
+        {
+            "$project": {
+            "_id": 0,
+            "nome": 1
+             }
+        }
+    ]
+    return run_query("artista","aggregate",pipeline)
 
 
 def get_album_mais_salvo_do_artista(id_do_artista):
