@@ -79,7 +79,7 @@ def plot_musica_favorita(user_id):
         
         st.markdown("**🏆 Sua Música Favorita**")
         st.markdown(f"<h3 style='color: #1ED760;'>{nome_musica}</h3>", unsafe_allow_html=True)
-        st.caption(f"Ovida {reproducoes} vezes")
+        st.caption(f"Ouvida {reproducoes} vezes")
     else:
         st.info("Você ainda não ouviu nenhuma música.")
 
