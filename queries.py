@@ -716,13 +716,17 @@ def check_account_type(id_conta):
     return 'desconhecido'
 
 def get_top1_musica_ouvida(user_id):
-    #Retorna a música mais ouvida pelo usuário
-    #Testado e funcionando mas cuidado... Foi a que deu mais trabalho
-    
+
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
 
     pipeline = [
         # 1. Achar o usuário
-        { "$match": { "idDaConta": int(user_id) } },
+        { "$match": { campo_id: int(user_id) } },
         
         # 2. Desmontar o array de músicas ouvidas
         { "$unwind": "$conta.musicasOuvidas" },
@@ -757,7 +761,7 @@ def get_top1_musica_ouvida(user_id):
         }
     ]
     
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 
 def get_top1_art_ouvido(user_id):
@@ -966,9 +970,15 @@ def get_top5_genero_musicas_ouvidas(user_id):
 
 def get_total_musicas_usuario(user_id):
     #Retorna o total de músicas diferentes que o usuário já ouviu.
-    
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
     pipeline = [
-        { "$match": { "idDaConta": user_id } },
+        { "$match": { campo_id: user_id } },
         
         {
             "$project": {
@@ -978,7 +988,7 @@ def get_total_musicas_usuario(user_id):
         }
     ]
     
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_top5_artistas_ouvidos(user_id):
     """
@@ -1079,9 +1089,16 @@ def get_top5_artistas_ouvidos(user_id):
     return run_query(colecao, "aggregate", pipeline)
 
 def get_top5_musicas_ouvidas(user_id):
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
+
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
     pipeline = [
         {
-            "$match": {"idDaConta": user_id}
+            "$match": {campo_id: user_id}
         },
         {"$unwind": "$conta.musicasOuvidas"},
         {
@@ -1117,7 +1134,7 @@ def get_top5_musicas_ouvidas(user_id):
             "$limit": 5
         }
     ]
-    return run_query("usuario", "aggregate", pipeline)
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_tempo_total_escutado_segundos(user_id):
     tipo = check_account_type(user_id)
