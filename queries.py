@@ -29,10 +29,53 @@ def get_art_mais_seguidores():
     ]
     return run_query("artista","aggregate",pipeline)
 
-
+# ATUALIZADA
 def get_album_mais_salvo_do_artista(id_do_artista):
-   
-    return run_query()
+    """Retorna o álbum mais salvo de um artista específico"""
+    pipeline = [
+        { "$match": { "conteudo.idDoArtista": id_do_artista } },
+        
+        { "$lookup": {
+            "from": "usuario",
+            "let": { "albumId": "$idAlbum" },
+            "pipeline": [
+                { "$unwind": "$albumsSalvos" },
+                { "$match": {
+                    "$expr": {
+                        "$eq": ["$albumsSalvos.idAlbum", "$$albumId"]
+                    }
+                }},
+                { "$group": {
+                    "_id": None,
+                    "count": { "$sum": 1 }
+                }},
+                { "$project": {
+                    "_id": 0,
+                    "count": 1
+                }}
+            ],
+            "as": "contagemDeSaves"
+        }},
+        
+        { "$addFields": {
+            "totalSaves": { "$arrayElemAt": ["$contagemDeSaves.count", 0] }
+        }},
+        
+        { "$match": {
+            "totalSaves": { "$gt": 0 }
+        }},
+        
+        { "$project": {
+            "_id": 0,
+            "nomeAlbum": "$conteudo.nome",
+            "totalSaves": 1
+        }},
+        
+        { "$sort": { "totalSaves": -1 } },
+        
+        { "$limit": 1 }
+    ]
+    return run_query("album", "aggregate", pipeline)
 
 
 def check_artist_type(id_artista):
@@ -50,19 +93,242 @@ def check_artist_type(id_artista):
 
     return 'desconhecido'
 
+# ATUALIZADA
 def get_top3_episodios_podcaster(id_artista):
-    
-    return run_query()
+    """Retorna os 3 episódios mais reproduzidos de um artista (podcaster)"""
+    pipeline = [
+        { "$match": { "idDoArtista": id_artista } },
+        
+        { "$unwind": "$conteudos" },
+        
+        { "$match": { "conteudos.podcast.idPodcast": { "$exists": True } } },
+        
+        { "$lookup": {
+            "from": "podcast",
+            "localField": "conteudos.podcast.idPodcast",
+            "foreignField": "idPodcast",
+            "as": "podcastInfo"
+        }},
+        
+        { "$unwind": "$podcastInfo" },
+        
+        { "$unwind": "$podcastInfo.episodios" },
+        
+        { "$lookup": {
+            "from": "usuario",
+            "let": { "episodioId": "$podcastInfo.episodios.idEpisodio" },
+            "pipeline": [
+                { "$unwind": "$conta.episodiosOuvidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$conta.episodiosOuvidos.idEpisodio", "$$episodioId"] }
+                }},
+                { "$project": { 
+                    "_id": 0, 
+                    "numeroReproducoes": "$conta.episodiosOuvidos.numeroReproducoes" 
+                }}
+            ],
+            "as": "reproducoesUsuario"
+        }},
+        
+        { "$lookup": {
+            "from": "artista",
+            "let": { "episodioId": "$podcastInfo.episodios.idEpisodio" },
+            "pipeline": [
+                { "$unwind": "$conta.episodiosOuvidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$conta.episodiosOuvidos.idEpisodio", "$$episodioId"] }
+                }},
+                { "$project": { 
+                    "_id": 0, 
+                    "numeroReproducoes": "$conta.episodiosOuvidos.numeroReproducoes" 
+                }}
+            ],
+            "as": "reproducoesArtista"
+        }},
+        
+        { "$group": {
+            "_id": "$podcastInfo.episodios.idEpisodio",
+            "nomeArtista": { "$first": "$conta.nome" },
+            "nomePodcast": { "$first": "$podcastInfo.conteudo.nome" },
+            "nomeEpisodio": { "$first": "$podcastInfo.episodios.nome" },
+            "idEpisodio": { "$first": "$podcastInfo.episodios.idEpisodio" },
+            "totalReproducoesUsuario": {
+                "$sum": { "$sum": "$reproducoesUsuario.numeroReproducoes" }
+            },
+            "totalReproducoesArtista": {
+                "$sum": { "$sum": "$reproducoesArtista.numeroReproducoes" }
+            }
+        }},
+        
+        { "$project": {
+            "nomeArtista": 1,
+            "nomePodcast": 1,
+            "nomeEpisodio": 1,
+            "idEpisodio": "$_id",
+            "totalReproducoes": { 
+                "$add": ["$totalReproducoesUsuario", "$totalReproducoesArtista"] 
+            }
+        }},
+        
+        { "$sort": { "totalReproducoes": -1 } },
+        
+        { "$limit": 3 },
+        
+        { "$project": {
+            "_id": 0,
+            "nomeArtista": 1,
+            "nomePodcast": 1,
+            "nomeEpisodio": 1,
+            "idEpisodio": 1,
+            "totalReproducoes": 1
+        }}
+    ]    
+    return run_query("artista", "aggregate", pipeline)
 
-
+# ATUALIZADA
 def get_seguidores_podcast_artista(id_artista):
- 
-    return run_query()
+    """Retorna os seguidores de cada podcast de um artista"""
+    pipeline = [
+        { "$match": { "idDoArtista": id_artista } },
+        
+        { "$unwind": "$conteudos" },
+        
+        { "$match": { "conteudos.podcast.idPodcast": { "$exists": True } } },
+        
+        { "$lookup": {
+            "from": "podcast",
+            "localField": "conteudos.podcast.idPodcast",
+            "foreignField": "idPodcast",
+            "as": "podcastInfo"
+        }},
+        
+        { "$unwind": "$podcastInfo" },
+        
+        { "$lookup": {
+            "from": "usuario",
+            "let": { "podcastId": "$podcastInfo.idPodcast" },
+            "pipeline": [
+                { "$unwind": "$podcastsSeguidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$podcastsSeguidos.idPodcast", "$$podcastId"] }
+                }},
+                { "$project": {
+                    "idUsuario": "$idDaConta"
+                }}
+            ],
+            "as": "seguidoresUsuarios"
+        }},
+        
+        { "$lookup": {
+            "from": "artista",
+            "let": { "podcastId": "$podcastInfo.idPodcast" },
+            "pipeline": [
+                { "$unwind": "$podcastsSeguidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$podcastsSeguidos.idPodcast", "$$podcastId"] }
+                }},
+                { "$project": {
+                    "idArtista": "$idDoArtista"
+                }}
+            ],
+            "as": "seguidoresArtistas"
+        }},
+        
+        { "$project": {
+            "_id": 0,
+            "nomeArtista": "$conta.nome",
+            "nomePodcast": "$podcastInfo.conteudo.nome",
+            "totalSeguidores": { 
+                "$add": [
+                    { "$size": "$seguidoresUsuarios" },
+                    { "$size": "$seguidoresArtistas" }
+                ]
+            },
+            "seguidoresUsuarios": { "$size": "$seguidoresUsuarios" },
+            "seguidoresArtistas": { "$size": "$seguidoresArtistas" }
+        }},
+        
+        { "$sort": { "totalSeguidores": -1 } }
+    ] 
+    return run_query("artista", "aggregate", pipeline)
 
-
+# ATUALIZADA
 def get_all_episode_plays_by_artist(id_artista):
-    
-    return run_query()
+    """Retorna todas as reproduções de episódios de um artista"""
+    pipeline = [
+        { "$match": { "idDoArtista": id_artista } },
+        
+        { "$unwind": "$conteudos" },
+        
+        { "$match": { "conteudos.podcast.idPodcast": { "$exists": True } } },
+        
+        { "$lookup": {
+            "from": "podcast",
+            "localField": "conteudos.podcast.idPodcast",
+            "foreignField": "idPodcast",
+            "as": "podcastInfo"
+        }},
+        
+        { "$unwind": "$podcastInfo" },
+        
+        { "$unwind": "$podcastInfo.episodios" },
+        
+        { "$lookup": {
+            "from": "artista",
+            "let": { "episodioId": "$podcastInfo.episodios.idEpisodio" },
+            "pipeline": [
+                { "$unwind": "$conta.episodiosOuvidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$conta.episodiosOuvidos.idEpisodio", "$$episodioId"] }
+                }},
+                { "$project": {
+                    "numeroReproducoes": "$conta.episodiosOuvidos.numeroReproducoes"
+                }}
+            ],
+            "as": "reproducoesArtistas"
+        }},
+        
+        { "$lookup": {
+            "from": "usuario",
+            "let": { "episodioId": "$podcastInfo.episodios.idEpisodio" },
+            "pipeline": [
+                { "$unwind": "$conta.episodiosOuvidos" },
+                { "$match": { 
+                    "$expr": { "$eq": ["$conta.episodiosOuvidos.idEpisodio", "$$episodioId"] }
+                }},
+                { "$project": {
+                    "numeroReproducoes": "$conta.episodiosOuvidos.numeroReproducoes"
+                }}
+            ],
+            "as": "reproducoesUsuarios"
+        }},
+        
+        { "$group": {
+            "_id": "$podcastInfo.episodios.idEpisodio",
+            "nomeArtista": { "$first": "$conta.nome" },
+            "nomePodcast": { "$first": "$podcastInfo.conteudo.nome" },
+            "nomeEpisodio": { "$first": "$podcastInfo.episodios.nome" },
+            "totalReproducoes": {
+                "$sum": { 
+                    "$add": [
+                        { "$sum": "$reproducoesArtistas.numeroReproducoes" },
+                        { "$sum": "$reproducoesUsuarios.numeroReproducoes" }
+                    ]
+                }
+            }
+        }},
+        
+        { "$sort": { "totalReproducoes": -1 } },
+        
+        { "$project": {
+            "_id": 0,
+            "nomeArtista": 1,
+            "nomePodcast": 1,
+            "nomeEpisodio": 1,
+            "totalReproducoes": 1
+        }}
+    ] 
+    return run_query("artista", "aggregate", pipeline)
 
 def get_all_artists():
     #todos os artistas ordenados ordem alfabetica
@@ -100,13 +366,85 @@ def get_song_count_per_album(id_artista):
     
     return run_query("album", "aggregate", pipeline)
 
+# ATUALIZADA
 def get_albums_by_artist(id_artista):
-    
-    return run_query()
+    """Retorna todos os álbuns de um artista"""
+    pipeline = [
+        { "$match": { "idDoArtista": id_artista } },
+        
+        { "$unwind": "$conteudos" },
+        
+        { "$match": { "conteudos.album.idAlbum": { "$exists": True } } },
+        
+        { "$lookup": {
+            "from": "album",
+            "localField": "conteudos.album.idAlbum",
+            "foreignField": "idAlbum",
+            "as": "albumInfo"
+        }},
+        
+        { "$unwind": "$albumInfo" },
+        
+        { "$project": {
+            "_id": 0,
+            "nomeAlbum": "$albumInfo.conteudo.nome"
+        }}
+    ]
+    return run_query("artista", "aggregate", pipeline)
 
+# ATUALIZADA
 def get_song_plays_by_album(id_album):
-
-    return run_query()
+    """Retorna as reproduções de todas as músicas de um álbum"""
+    pipeline = [
+        { "$match": { "idAlbum": id_album } },
+        
+        { "$unwind": "$musicas" },
+        
+        { "$lookup": {
+            "from": "usuario",
+            "localField": "musicas.idDaMusica",
+            "foreignField": "conta.musicasOuvidas.idDaMusica",
+            "as": "usuariosQueOuviram"
+        }},
+        
+        { "$unwind": {
+            "path": "$usuariosQueOuviram",
+            "preserveNullAndEmptyArrays": True
+        }},
+        
+        { "$unwind": {
+            "path": "$usuariosQueOuviram.conta.musicasOuvidas",
+            "preserveNullAndEmptyArrays": True
+        }},
+        
+        { "$match": {
+            "$or": [
+                { "usuariosQueOuviram.conta.musicasOuvidas": { "$exists": False } },
+                { "$expr": {
+                    "$eq": ["$musicas.idDaMusica", "$usuariosQueOuviram.conta.musicasOuvidas.idDaMusica"]
+                }}
+            ]
+        }},
+        
+        { "$group": {
+            "_id": "$musicas.idDaMusica",
+            "nomeMusica": { "$first": "$musicas.nome" },
+            "totalReproducoes": {
+                "$sum": { 
+                    "$ifNull": ["$usuariosQueOuviram.conta.musicasOuvidas.numeroReproducoes", 0] 
+                }
+            }
+        }},
+        
+        { "$sort": { "totalReproducoes": -1 } },
+        
+        { "$project": {
+            "_id": 0,
+            "nomeMusica": 1,
+            "totalReproducoes": 1
+        }}
+    ]
+    return run_query("album", "aggregate", pipeline)
 
 # ------------ TAB GERAL --------------
 
