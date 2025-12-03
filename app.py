@@ -1,5 +1,6 @@
 import streamlit as st
 import altair as alt
+import psycopg2
 import plotly.express as px
 from dotenv import load_dotenv
 import os
@@ -12,10 +13,15 @@ import plot_querys as pq
 def load_css(file_name):
     """Lê um arquivo CSS e o injeta no Streamlit usando st.markdown."""
     try:
+        # Tenta construir o caminho para o arquivo CSS
+        # Garante que o caminho seja relativo ao local onde o script está rodando
         css_path = os.path.join("assets/styles", file_name) 
+        
         with open(css_path, "r") as f:
             css = f.read()
+            # Usa st.markdown para injetar o CSS dentro de uma tag <style>
             st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
+            
     except FileNotFoundError:
         st.error(f"Erro: Arquivo CSS não encontrado em '{css_path}'")
     except Exception as e:
@@ -25,186 +31,155 @@ def load_css(file_name):
 # 2. Funções e Verificação de Login
 # ----------------------------------------
 
+# Configuração da página (Colapsa a barra lateral no início, a menos que o conteúdo force a aparecer)
 st.set_page_config(
     page_title="Dashboard Análise do Spotify",
     page_icon="🎵",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed" # Tenta colapsar o sidebar
 )
 
+# Inicializar/Garantir session_state
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = "Usuário Convidado"
 
+# >>> Lógica Principal de Autenticação <<<
+# Se o usuário NÃO estiver logado, redireciona para a página de login e interrompe a execução
 if not st.session_state.logged_in:
+    # Redireciona para o login que está na pasta pages
     st.switch_page("pages/login.py") 
+    # st.stop() é opcional aqui, switch_page já faz o trabalho de encerrar o script atual.
 
+# Função de Logout (só é exibida se estiver logado)
 def do_logout():
     st.session_state.logged_in = False
     st.session_state.username = ""
-    st.switch_page("pages/login.py")
+    st.switch_page("pages/login.py") # Redireciona de volta ao login
 
 # ----------------------------------------
-# 3. Carregamento do CSS e Layout
+# 3. Carregamento do CSS
 # ----------------------------------------
-load_css("app.css") 
+load_css("app.css") # <-- Carrega o arquivo .css da página
 
+# ----------------------------------------
+# 3. Layout do Dashboard (SÓ EXECUTA SE ESTIVER LOGADO)
+# ----------------------------------------
+
+# Cabeçalho com informações de login
 with st.container():
     col1, col2 = st.columns([4, 1])
     with col1:
         st.markdown(f"<h4 style='color: #1ED760;'>👤 Logado como: {st.session_state.username}</h4>", unsafe_allow_html=True)
     with col2:
+        # Conecta o botão de sair à função do_logout
         st.button("🚪 Sair", type="secondary", on_click=do_logout)
         
+# Título e logo
 st.markdown("<h1 class='main-title'>Dashboard para análise Spotify</h1>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns([1, 1, 1])
 
 with col2:
-    st.markdown("<p class='image-label'>Um dashboard sobre uma aplicação análoga ao Spotify (Versão MongoDB)</p>", unsafe_allow_html=True)
+    #st.image("assets\images\logo_spotify.svg", width=200)
+    st.markdown("<p class='image-label'>Um dashboard sobre uma aplicação análoga ao Spotify</p>", unsafe_allow_html=True)
 
 # Sistema de Tabs
 tab1, tab2, tab3 = st.tabs(["📊 Visão Geral", "🎤 Análise Artistas", "👤 Análise do Usuário"])
 
 
-# ==============================================================================
 # TAB 1: Visão Geral
-# ==============================================================================
 with tab1:
     st.markdown("<div class='content-box'>", unsafe_allow_html=True)
     st.header("📊 Visão Geral")
 
-    col1, col2 = st.columns(2)
+    # Placeholder para gráficos
+    col1, col2= st.columns(2)
 
     with col1:
-        # --- FUNÇÕES SQL ANTIGAS (COMENTADAS) ---
         pq.plot_total_musicas()
         pq.plot_total_artistas()
-        st.info("🚧 Top 5 Músicas (Em migração para MongoDB)")
-        # pq.plot_top5_musicas_geral()
-        
+        st.subheader("Top 5 Músicas Mais Reproduzidas: 🎧")
+        pq.plot_top5_musicas_geral()
         st.subheader("Top 5 álbuns mais salvos pelos usuários ⭐")
         pq.plot_top_5_albuns_salvos()
 
     with col2:
         pq.plot_total_album()
         pq.plot_total_podcast()
-
         st.subheader("Top 10 álbuns com mais Faixas 💿")
-        #pq.plot_top_10_albuns()
-        
-        st.info("🚧 Podcasts mais seguidos (Em migração para MongoDB)")
-        # pq.plot_top_5_podcasts_seguidos()
+        pq.plot_top_10_albuns()
+        st.subheader("Top 5 podcasts mais seguidos 📈")
+        pq.plot_top_5_podcasts_seguidos()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ==============================================================================
 # TAB 2: Análise de Artistas
-# ==============================================================================
+
 with tab2:
     st.header("🎤 Análise dos Artistas")
     st.subheader("Destaques da Categoria")
-    
-    col1, col2 = st.columns(2)
+    col1, col2= st.columns(2)
     with col1:
-        # pq.plot_artista_mais_seguido() (ANTIGO)
-        st.info("🚧 Artista com mais seguidores (Em migração)")
-        
+        pq.plot_artista_mais_seguido()
     with col2:
-        # --- FUNÇÃO NOVA MONGODB ✅ ---
         pq.plot_artista_mais_mus_publi()
-
     st.markdown("---")
-    
-    # --- NOVA LÓGICA DE SELEÇÃO DE ARTISTA (ADAPTADA PARA O NOVO PLOT_QUERYS) ---
-    st.subheader("Selecione um artista para análise")
-    
-    # Busca a lista de artistas usando a query nova
-    df_artistas = pq.get_lista_artistas()
-    
-    if not df_artistas.empty:
-        artista_escolhido = st.selectbox(
-            "Digite para filtrar artistas:",
-            df_artistas["nome"].tolist()
-        )
-        
-        # Pega o ID do artista selecionado
-        id_artista = int(df_artistas[df_artistas["nome"] == artista_escolhido]["idDoArtista"].iloc[0])
-        
-        st.success(f"Artista selecionado: {artista_escolhido}")
-        
-        # --- FUNÇÃO NOVA MONGODB ✅ ---
-        st.subheader(f"Discografia de {artista_escolhido}")
-        pq.plot_discografia_artista(id_artista)
-        
-        # --- CÓDIGO ANTIGO COMPLEXO (COMENTADO POR ENQUANTO) ---
-        '''
-        artist_type = q.check_artist_type(id_artista)
-        if artist_type == 'musico':
-            # ... Lógica antiga de músico ...
-            pass
-        elif artist_type == 'podcaster':
-            # ... Lógica antiga de podcaster ...
-            pass
-        '''
-        st.info("ℹ️ Outras métricas detalhadas (gênero, reproduções por música, tipo de artista) estão sendo migradas do SQL.")
-        
-    else:
-        st.warning("Não foi possível carregar a lista de artistas.")
+    pq.plot_info_artista()
 
-
-# ==============================================================================
 # TAB 3: Análise do Usuário
-# ==============================================================================
+
 with tab3:
+    # Pegue o ID do usuário da sessão
     user_id_logado = st.session_state.user_id
     username_logado = st.session_state.username
 
     st.markdown("<div class='content-box'>", unsafe_allow_html=True)
-    st.header(f"👤 Análise de {st.session_state.username}")
+    st.header(f"👤 Análise de {st.session_state.username}")  # Nome vindo do login
     st.subheader("Suas estatísticas pessoais")
+
+    # Métricas do usuário
 
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
-        # --- FUNÇÃO NOVA MONGODB ✅ ---
         pq.plot_total_musicas_user(user_id_logado)
 
     with col2:
-        # pq.plot_tempo_total_escutado(user_id_logado) (ANTIGO)
-        st.write("⏱️ (Em breve)")
+        pq.plot_tempo_total_escutado(user_id_logado)
 
     with col3:
-        # pq.plot_genero_musica_preferido(user_id_logado) (ANTIGO)
-        st.write("🎵 (Em breve)")
+        pq.plot_genero_musica_preferido(user_id_logado)
 
     with col4:
-        # --- FUNÇÃO NOVA MONGODB ✅ ---
         pq.plot_musica_favorita(user_id_logado)
 
     with col5:
-        # pq.plot_artista_favorito(user_id_logado) (ANTIGO)
-        st.write("⭐ (Em breve)")
+        pq.plot_artista_favorito(user_id_logado)
 
     st.markdown("---")
 
     st.subheader("📈 Análise de estatísticas")
-    st.info("🚧 Gráficos detalhados do usuário (Top 5 gêneros, artistas, histórico) em migração.")
-    
-    # with st.expander("Ver estatísticas detalhadas"):
-    #     pq.plot_top5_musicas_usuario(user_id_logado)
-    #     col1, col2 =st.columns(2)
-    #     with col1:
-    #         pq.plot_top5_genero_musicas_ouvidas(user_id_logado)
-    #     with col2:    
-    #         pq.plot_top5_artistas_ouvidos(user_id_logado)
+    with st.expander("Ver estatísticas detalhadas"):
+        pq.plot_top5_musicas_usuario(user_id_logado)
+
+        col1, col2 =st.columns(2)
+        with col1:
+            pq.plot_top5_genero_musicas_ouvidas(user_id_logado)
+        with col2:    
+            pq.plot_top5_artistas_ouvidos(user_id_logado)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Rodapé
+
 st.markdown("---")
+
 st.markdown(
-    "<p style='text-align: center; color: #888;'>Dashboard Spotify Analytics © 2025 (MongoDB Edition)</p>",
+
+    "<p style='text-align: center; color: #888;'>Dashboard Spotify Analytics © 2025</p>",
+
     unsafe_allow_html=True
+
 )
