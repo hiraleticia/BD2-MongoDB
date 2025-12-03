@@ -81,23 +81,23 @@ def get_song_plays_by_album(id_album):
 # ------------ TAB GERAL --------------
 
 def get_total_musicas_geral_count():
-    return run_query()
-
+    pipeline = [
+        {"$project": {"qtdMusicas": {"$size": "$musicas"}}},
+        {"$group": {"_id": "null", "total": {"$sum": "$qtdMusicas"}}},
+        {"$project": {"_id": 0, "total": 1}}
+    ]
+    return run_query("album", "aggregate", pipeline)
 
 def get_total_artistas_geral_count():
-
-    return run_query("album", "count_documents")
+    return run_query("artista", "count_documents",{})
 
 def get_total_album_geral_count():
-   
-    return run_query()
+    return run_query("album", "count_documents",{})
 
 def get_total_podcasts_geral_count():
-
-    return run_query()
+    return run_query("podcast", "count_documents",{})
 
 def get_top5_musicas_geral():
-  
     return run_query()
 
 
@@ -119,13 +119,62 @@ def get_top_10_albuns_com_mais_faixas():
     return run_query("album", "aggregate", pipeline)
 
 def get_top5_albuns_salvos():
-   
-    return run_query()
+    pipeline = [
+        { "$unwind": "$albumsSalvos" },
+        {
+            "$group": {
+                "_id": "$albumsSalvos.idAlbum",
+                "total_salvos": { "$sum": 1}
+            }
+        },
+        { "$sort": { "total_salvos": -1 } },
+        { "$limit": 5 },
+        {
+            "$lookup": {
+                "from": "album",
+                "localField": "_id",
+                "foreignField": "idAlbum",
+                "as": "detalhesAlbum"
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "total_salvos": 1,
+                "nome": { "$arrayElemAt": ["$detalhesAlbum.conteudo.nome", 0]}
+            }
+        }
+    ]
+    return run_query("usuario", "aggregate", pipeline )
 
 
 def get_top5_podcast_seguidos():
- 
-    return run_query()
+    pipeline = [
+        { "$unwind": "$podcastsSeguidos"},
+        {
+            "$group": {
+            "_id": "$podcastsSeguidos.idPodcast",
+            "totalPodcastSeguidos": { "$sum": 1}
+        }
+        },
+        { "$sort": {"totalPodcastSeguidos": -1}},
+        { "$limit": 5},
+        {
+            "$lookup": {
+            "from": "podcast",
+            "localField": "_id",
+            "foreignField": "idPodcast",
+            "as": "detalhesPodcast"
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "nomePodcast": {"$arrayElemAt": ["$detalhesPodcast.conteudo.nome", 0]}
+            }
+        }
+    ]
+    return run_query("usuario", "aggregate", pipeline )
 
 def get_art_mais_mus_publi():
     #artista com o maior número de musicas publicadas

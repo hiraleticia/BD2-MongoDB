@@ -79,21 +79,19 @@ with tab1:
     with col1:
         # --- FUNÇÕES SQL ANTIGAS (COMENTADAS) ---
         pq.plot_total_musicas()
-        # pq.plot_total_artistas()
+        pq.plot_total_artistas()
         st.info("🚧 Top 5 Músicas (Em migração para MongoDB)")
         # pq.plot_top5_musicas_geral()
         
-        st.info("🚧 Álbuns mais salvos (Em migração para MongoDB)")
-        # pq.plot_top_5_albuns_salvos()
+        st.subheader("Top 5 álbuns mais salvos pelos usuários ⭐")
+        pq.plot_top_5_albuns_salvos()
 
     with col2:
-        # --- FUNÇÕES SQL ANTIGAS (COMENTADAS) ---
-        # pq.plot_total_album()
-        # pq.plot_total_podcast()
+        pq.plot_total_album()
+        pq.plot_total_podcast()
 
         st.subheader("Top 10 álbuns com mais Faixas 💿")
-        # --- FUNÇÃO NOVA MONGODB ✅ ---
-        pq.plot_top_10_albuns()
+        #pq.plot_top_10_albuns()
         
         st.info("🚧 Podcasts mais seguidos (Em migração para MongoDB)")
         # pq.plot_top_5_podcasts_seguidos()
