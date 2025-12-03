@@ -78,7 +78,7 @@ with tab1:
 
     with col1:
         # --- FUNÇÕES SQL ANTIGAS (COMENTADAS) ---
-        # pq.plot_total_musicas()
+        pq.plot_total_musicas()
         # pq.plot_total_artistas()
         st.info("🚧 Top 5 Músicas (Em migração para MongoDB)")
         # pq.plot_top5_musicas_geral()
