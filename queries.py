@@ -366,7 +366,6 @@ def get_song_count_per_album(id_artista):
     
     return run_query("album", "aggregate", pipeline)
 
-# ATUALIZADA
 def get_albums_by_artist(id_artista):
     """Retorna todos os álbuns de um artista"""
     pipeline = [
@@ -713,15 +712,8 @@ def get_top1_musica_ouvida(user_id):
 
 
 def get_top1_art_ouvido(user_id):
-    tipo = check_account_type(user_id)
-    if tipo == 'desconhecido':
-        return pd.DataFrame()
-
-    colecao = "usuario" if tipo == 'usuario' else "artista"
-    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
-
     pipeline = [
-        {"$match": {campo_id: user_id}},
+        {"$match": {"idDaConta": user_id}},
 
         # Processar músicas e episódios em paralelo
         {
@@ -813,7 +805,7 @@ def get_top1_art_ouvido(user_id):
         }
     ]
 
-    return run_query(colecao, "aggregate", pipeline)
+    return run_query("usuario", "aggregate", pipeline)
 
 def get_genero_musica_ouvida(user_id):
     """
@@ -868,14 +860,47 @@ def get_genero_musica_ouvida(user_id):
 
 
 def get_top5_genero_musicas_ouvidas(user_id):
-   
-    return run_query()
+    """
+    Top 5 gêneros de música mais ouvidos
+    """
+    pipeline = [
+        {"$match": {"idDaConta": user_id}},
+        {"$unwind": "$conta.musicasOuvidas"},
 
+        {
+            "$lookup": {
+                "from": "album",
+                "let": {"musicaId": "$conta.musicasOuvidas.idDaMusica"},
+                "pipeline": [
+                    {"$unwind": "$musicas"},
+                    {"$match": {"$expr": {"$eq": ["$musicas.idDaMusica", "$$musicaId"]}}},
+                    {"$project": {"genero": "$musicas.genero"}}
+                ],
+                "as": "musicaInfo"
+            }
+        },
+        {"$unwind": "$musicaInfo"},
 
-def get_genero_podcast_ouvido(user_id):
-  
-    return run_query()
+        {
+            "$group": {
+                "_id": "$musicaInfo.genero",
+                "reproducoes_totais": {"$sum": "$conta.musicasOuvidas.numeroReproducoes"}
+            }
+        },
 
+        {"$sort": {"reproducoes_totais": -1}},
+        {"$limit": 5},
+
+        {
+            "$project": {
+                "_id": 0,
+                "genero": "$_id",
+                "reproducoes_totais": 1
+            }
+        }
+    ]
+
+    return run_query("usuario", "aggregate", pipeline)
 
 def get_total_musicas_usuario(user_id):
     #Retorna o total de músicas diferentes que o usuário já ouviu.
@@ -894,12 +919,137 @@ def get_total_musicas_usuario(user_id):
     return run_query("usuario", "aggregate", pipeline)
 
 def get_top5_artistas_ouvidos(user_id):
-   
-    return run_query()
+    """
+    Top 5 artistas mais ouvidos (músicas + podcasts)
+    """
+    pipeline = [
+        {"$match": {"idDaConta": user_id}},
+
+        {
+            "$facet": {
+                "musicas": [
+                    {"$unwind": "$conta.musicasOuvidas"},
+                    {
+                        "$lookup": {
+                            "from": "album",
+                            "let": {"musicaId": "$conta.musicasOuvidas.idDaMusica"},
+                            "pipeline": [
+                                {"$match": {"$expr": {"$in": ["$$musicaId", "$musicas.idDaMusica"]}}},
+                                {"$project": {"conteudo.idDoArtista": 1}}
+                            ],
+                            "as": "album"
+                        }
+                    },
+                    {"$unwind": "$album"},
+                    {
+                        "$project": {
+                            "idDoArtista": "$album.conteudo.idDoArtista",
+                            "reproducoes": "$conta.musicasOuvidas.numeroReproducoes"
+                        }
+                    }
+                ],
+
+                "episodios": [
+                    {"$unwind": "$conta.episodiosOuvidos"},
+                    {
+                        "$lookup": {
+                            "from": "podcast",
+                            "let": {"episodioId": "$conta.episodiosOuvidos.idEpisodio"},
+                            "pipeline": [
+                                {"$match": {"$expr": {"$in": ["$$episodioId", "$episodios.idEpisodio"]}}},
+                                {"$project": {"conteudo.idDoArtista": 1}}
+                            ],
+                            "as": "podcast"
+                        }
+                    },
+                    {"$unwind": "$podcast"},
+                    {
+                        "$project": {
+                            "idDoArtista": "$podcast.conteudo.idDoArtista",
+                            "reproducoes": "$conta.episodiosOuvidos.numeroReproducoes"
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "$project": {
+                "combinado": {"$concatArrays": ["$musicas", "$episodios"]}
+            }
+        },
+        {"$unwind": "$combinado"},
+
+        {
+            "$group": {
+                "_id": "$combinado.idDoArtista",
+                "reproducoes_totais": {"$sum": "$combinado.reproducoes"}
+            }
+        },
+
+        {"$sort": {"reproducoes_totais": -1}},
+        {"$limit": 5},
+
+        {
+            "$lookup": {
+                "from": "artista",
+                "localField": "_id",
+                "foreignField": "idDoArtista",
+                "as": "artista"
+            }
+        },
+        {"$unwind": "$artista"},
+
+        {
+            "$project": {
+                "_id": 0,
+                "nome": "$artista.conta.nome",
+                "reproducoes_totais": 1
+            }
+        }
+    ]
+    return run_query("usuario", "aggregate", pipeline)
 
 def get_top5_musicas_ouvidas(user_id):
-    
-    return run_query()
+    pipeline = [
+        {
+            "$match": {"idDaConta": user_id}
+        },
+        {"$unwind": "$conta.musicasOuvidas"},
+        {
+            "$lookup": {
+                "from": "album",
+                "localField": "conta.musicasOuvidas.idDaMusica",
+                "foreignField": "musicas.idDaMusica",
+                "as": "dadosAlbum"
+            }
+        },
+        {"$unwind": "$dadosAlbum"},
+        {"$unwind": "$dadosAlbum.musicas"},
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": ["$dadosAlbum.musicas.idDaMusica", "$conta.musicasOuvidas.idDaMusica"]
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "nome": "$dadosAlbum.musicas.nome",
+                "numero_reproducoes": "$conta.musicasOuvidas.numeroReproducoes"
+            }
+        },
+        {
+            "$sort": {
+                "numero_reproducoes": -1
+            }
+        },
+        {
+            "$limit": 5
+        }
+    ]
+    return run_query("usuario", "aggregate", pipeline)
 
 def get_tempo_total_escutado_segundos(user_id):
     pipeline = [
