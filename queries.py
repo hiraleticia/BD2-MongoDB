@@ -17,11 +17,12 @@ def get_art_mais_seguidores():
                 }
             }
         },
-        { "$sort": {"totalSeguidores": -1}},
+        { "$sort": {"total_seguidores": -1}},
         { "$limit": 1},
         {
             "$project": {
             "_id": 0,
+            "total_seguidores": 1,
             "nome": 1
              }
         }
@@ -171,10 +172,10 @@ def get_top5_podcast_seguidos():
         {
             "$group": {
             "_id": "$podcastsSeguidos.idPodcast",
-            "totalPodcastSeguidos": { "$sum": 1}
+            "total_seguidores": { "$sum": 1}
         }
         },
-        { "$sort": {"totalPodcastSeguidos": -1}},
+        { "$sort": {"total_seguidores": -1}},
         { "$limit": 5},
         {
             "$lookup": {
@@ -187,7 +188,8 @@ def get_top5_podcast_seguidos():
         {
             "$project": {
                 "_id": 0,
-                "nomePodcast": {"$arrayElemAt": ["$detalhesPodcast.conteudo.nome", 0]}
+                "total_seguidores": 1,
+                "nome": {"$arrayElemAt": ["$detalhesPodcast.conteudo.nome", 0]}
             }
         }
     ]
