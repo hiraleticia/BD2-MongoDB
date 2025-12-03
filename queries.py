@@ -510,7 +510,7 @@ def get_genero_musica_ouvida(user_id):
 
         {
             "$group": {
-                "_id": "$musicaInfo",
+                "_id": "$musicaInfo.genero",
                 "reproducoes_totais": {"$sum": "$conta.musicasOuvidas.numeroReproducoes"}
             }
         },
