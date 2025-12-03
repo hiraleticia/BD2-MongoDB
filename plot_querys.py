@@ -498,7 +498,23 @@ def plot_artista_favorito(user_id_logado):
 
 def plot_genero_musica_preferido(user_id_logado): ###### ALTERAR
     df_gen_album = q.get_genero_musica_ouvida(user_id_logado)
-    genero_album_pref = df_gen_album.iloc[0]['genero'] if not df_gen_album.empty else "N/A"
+    genero_album_pref = "N/A"
+    # CASO 1: Se for um DataFrame (Pandas)
+    if isinstance(df_gen_album, pd.DataFrame):
+        if not df_gen_album.empty:
+            genero_album_pref = df_gen_album.iloc[0]['genero']
+
+    # CASO 2: Se for um Dicionário (como sugeriu o erro anterior)
+    elif isinstance(df_gen_album, dict):
+        genero_album_pref = df_gen_album.get('genero', 'N/A')
+
+    # CASO 3: Se for uma Lista (retorno comum do MongoDB aggregate)
+    elif isinstance(df_gen_album, list) and len(df_gen_album) > 0:
+        genero_album_pref = df_gen_album[0].get('genero', 'N/A')
+
+    # CASO 4: Se você já alterou a outra função para retornar String direta
+    elif isinstance(df_gen_album, str):
+        genero_album_pref = df_gen_album
     st.metric("Gênero de Música Preferido", genero_album_pref)
 
 def plot_musica_favorita(user_id_logado):

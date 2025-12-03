@@ -36,8 +36,19 @@ def get_album_mais_salvo_do_artista(id_do_artista):
 
 
 def check_artist_type(id_artista):
-    
-    return run_query()
+    # Verifica se é podcaster
+    df_podcast = run_query('podcast', 'find_one', {"conteudo.idDoArtista": id_artista}, {"_id": 1})
+
+    if not df_podcast.empty:
+        return 'podcaster'
+
+    # Verifica se é músico
+    df_album = run_query('album', 'find_one', {"conteudo.idDoArtista": id_artista}, {"_id": 1})
+
+    if not df_album.empty:
+        return 'musico'
+
+    return 'desconhecido'
 
 def get_top3_episodios_podcaster(id_artista):
     
@@ -60,6 +71,7 @@ def get_all_artists():
         {
             "$project": {
                 "idDoArtista": 1,
+                "id_do_artista": "$idDoArtista",
                 "nome": "$conta.nome",
                 "_id": 0
             }
@@ -116,7 +128,67 @@ def get_total_podcasts_geral_count():
     return run_query("podcast", "count_documents",{})
 
 def get_top5_musicas_geral():
-    return run_query()
+    pipeline = [
+            { "$unwind": "$musicas"},
+            { "$lookup": {
+                "from": "usuario",
+                "let": {"musicaId": "$musicas.idDaMusica"},
+                "pipeline": [
+                    { "$unwind": "$conta.musicasOuvidas"},
+                        {
+                          "$match": {
+                          "$expr": {"$eq": ["$conta.musicasOuvidas.idDaMusica", "$$musicaId"]}
+                            }
+                        },
+                    { "$project": {"_id": 0,"numeroReproducoes": "$conta.musicasOuvidas.numeroReproducoes"}}
+                ],
+                "as":"reproducoesUsuario"}
+            },
+            { "$lookup": {
+                "from": "artista",
+                "let": {"musicaId": "$musicas.idDaMusica"},
+                "pipeline": [
+                    { "$unwind": "$conta.musicasOuvidas"},
+                        {
+                          "$match": {
+                          "$expr": {"$eq": ["$conta.musicasOuvidas.idDaMusica", "$$musicaId"]}
+                            }
+                        },
+                    { "$project": {"_id": 0,"numeroReproducoes": "$conta.musicasOuvidas.numeroReproducoes"}}
+                ],
+                "as": "reproducoesArtista"}
+            },
+
+            { "$group": {
+               "_id": "$musicas.idDaMusica",
+               "nome_da_musica": { "$first": "$musicas.nome" },
+               "nome_do_album": {"$first": "$conteudo.nome"},
+                "totalReproducoesUsuario": {
+                    "$sum": { "$sum": "$reproducoesUsuario.numeroReproducoes"}
+                },
+
+                "totalReproducoesArtista": {
+                    "$sum": { "$sum": "$reproducoesArtista.numeroReproducoes"}
+                }}
+            },
+            { "$project": {
+                 "nome_da_musica": 1,
+                 "nome_do_album": 1,
+                 "idDaMusica": "$_id",
+                 "total_de_reproducoes": { "$add": ["$totalReproducoesUsuario", "$totalReproducoesArtista"] }
+            }},
+
+            { "$sort": {"total_de_reproducoes": -1}},
+            { "$limit": 5},
+            {"$project": {
+                "_id": 0,
+                "nome_da_musica": 1,
+                "nome_do_album": 1,
+                "idDaMusica": "$_id",
+                "total_de_reproducoes": 1
+            }}
+    ]
+    return run_query("album","aggregate",pipeline)
 
 
 def get_top_10_albuns_com_mais_faixas():
@@ -238,6 +310,25 @@ def get_art_mais_mus_publi():
 
 
 # ------------ TAB USUÁRIO --------------
+# Nova função para checar se é artista ou usuário
+def check_account_type(id_conta):
+    try:
+        id_ajustado = int(id_conta)
+    except ValueError:
+        # Se não der para converter para número, mantém como string
+        id_ajustado = id_conta
+    # 1. Verifica se existe na coleção 'usuario'
+    df_usuario = run_query("usuario", "find_one", {"idDaConta": id_ajustado}, {"_id": 1})
+    if not df_usuario.empty:
+        return 'usuario'
+    # 2. Verifica se existe na coleção 'artista'
+
+    df_artista = run_query("artista", "find_one", {"idDoArtista": id_ajustado}, {"_id": 1})
+    if not df_artista.empty:
+        return 'artista'
+
+    return 'desconhecido'
+
 def get_top1_musica_ouvida(user_id):
     #Retorna a música mais ouvida pelo usuário
     #Testado e funcionando mas cuidado... Foi a que deu mais trabalho
@@ -284,13 +375,159 @@ def get_top1_musica_ouvida(user_id):
 
 
 def get_top1_art_ouvido(user_id):
-   
-    return run_query()
+    tipo = check_account_type(user_id)
+    if tipo == 'desconhecido':
+        return pd.DataFrame()
 
+    colecao = "usuario" if tipo == 'usuario' else "artista"
+    campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
+    pipeline = [
+        {"$match": {campo_id: user_id}},
+
+        # Processar músicas e episódios em paralelo
+        {
+            "$facet": {
+                # Branch 1: Músicas
+                "musicas": [
+                    {"$unwind": "$conta.musicasOuvidas"},
+                    {
+                        "$lookup": {
+                            "from": "album",
+                            "let": {"musicaId": "$conta.musicasOuvidas.idDaMusica"},
+                            "pipeline": [
+                                {"$match": {"$expr": {"$in": ["$$musicaId", "$musicas.idDaMusica"]}}},
+                                {"$project": {"conteudo.idDoArtista": 1}}
+                            ],
+                            "as": "album"
+                        }
+                    },
+                    {"$unwind": "$album"},
+                    {
+                        "$project": {
+                            "idDoArtista": "$album.conteudo.idDoArtista",
+                            "reproducoes": "$conta.musicasOuvidas.numeroReproducoes"
+                        }
+                    }
+                ],
+
+                # Branch 2: Episódios
+                "episodios": [
+                    {"$unwind": "$conta.episodiosOuvidos"},
+                    {
+                        "$lookup": {
+                            "from": "podcast",
+                            "let": {"episodioId": "$conta.episodiosOuvidos.idEpisodio"},
+                            "pipeline": [
+                                {"$match": {"$expr": {"$in": ["$$episodioId", "$episodios.idEpisodio"]}}},
+                                {"$project": {"conteudo.idDoArtista": 1}}
+                            ],
+                            "as": "podcast"
+                        }
+                    },
+                    {"$unwind": "$podcast"},
+                    {
+                        "$project": {
+                            "idDoArtista": "$podcast.conteudo.idDoArtista",
+                            "reproducoes": "$conta.episodiosOuvidos.numeroReproducoes"
+                        }
+                    }
+                ]
+            }
+        },
+
+        # Combinar resultados
+        {
+            "$project": {
+                "combinado": {"$concatArrays": ["$musicas", "$episodios"]}
+            }
+        },
+        {"$unwind": "$combinado"},
+
+        # Agrupar por artista
+        {
+            "$group": {
+                "_id": "$combinado.idDoArtista",
+                "totalReproducoes": {"$sum": "$combinado.reproducoes"}
+            }
+        },
+
+        {"$sort": {"totalReproducoes": -1}},
+        {"$limit": 1},
+
+        # Buscar nome do artista
+        {
+            "$lookup": {
+                "from": "artista",
+                "localField": "_id",
+                "foreignField": "idDoArtista",
+                "as": "artista"
+            }
+        },
+        {"$unwind": "$artista"},
+
+        {
+            "$project": {
+                "_id": 0,
+                "nome": "$artista.conta.nome",
+                "totalReproducoes": 1
+            }
+        }
+    ]
+
+    return run_query(colecao, "aggregate", pipeline)
 
 def get_genero_musica_ouvida(user_id):
-  
-    return run_query()
+    """
+    Gênero de música mais ouvido
+    Funciona para usuário OU artista
+    """
+    #tipo = check_account_type(user_id)
+
+    #if tipo == 'desconhecido':
+       # return pd.DataFrame({'genero': ['N/A']})
+
+    #colecao = "usuario" if tipo == 'usuario' else "artista"
+    #campo_id = "idDaConta" if tipo == 'usuario' else "idDoArtista"
+
+    pipeline = [
+        {"$match": {"idDaConta": user_id}},
+        {"$unwind": "$conta.musicasOuvidas"},
+
+        {
+            "$lookup": {
+                "from": "album",
+                "let": {"musicaId": "$conta.musicasOuvidas.idDaMusica"},
+                "pipeline": [
+                    {"$unwind": "$musicas"},
+                    {"$match": {"$expr": {"$eq": ["$musicas.idDaMusica", "$$musicaId"]}}},
+                    {"$project": {"genero": "$musicas.genero"}}
+                ],
+                "as": "musicaInfo"
+            }
+        },
+        {"$unwind": "$musicaInfo"},
+
+        {
+            "$group": {
+                "_id": "$musicaInfo",
+                "reproducoes_totais": {"$sum": "$conta.musicasOuvidas.numeroReproducoes"}
+            }
+        },
+
+        {"$sort": {"reproducoes_totais": -1}},
+        {"$limit": 1},
+
+        {
+            "$project": {
+                "genero": "$_id",
+                "reproducoes_totais": 1
+            }
+        }
+    ]
+
+    return run_query("usuario", "aggregate", pipeline)
+
 
 def get_top5_genero_musicas_ouvidas(user_id):
    
@@ -327,5 +564,35 @@ def get_top5_musicas_ouvidas(user_id):
     return run_query()
 
 def get_tempo_total_escutado_segundos(user_id):
-   
-    df = run_query()
+    pipeline = [
+        {"$match":{"idDaConta":user_id}},
+        {"$unwind":"$conta.musicasOuvidas"},
+        {"$lookup":
+        {
+            "from":"album",
+            "let":{"musica_id":"$conta.musicasOuvidas.idDaMusica"},
+            "pipeline":[
+                {
+                    "$match":{"$expr":{"$in":["$$musica_id","$musicas.idDaMusica"]}}
+                },
+                {"$unwind":"$musicas"},
+                {"$match":{"$expr":{"$eq":["$musicas.idDaMusica","$$musica_id"]}}},
+                {"$project":{"tempoDeDuracaoMS":{"$convert":{"input":"$musicas.tempoDeDuracao","to":"long","onError":0,"onNull":0}}}}
+            ],
+            "as":"duracaoInfo"
+        }
+        },
+        {"$unwind":"$duracaoInfo"},
+        {"$group":{"_id":"null","tempoTotalMS":{"$sum":{"$multiply":["$duracaoInfo.tempoDeDuracaoMS","$conta.musicasOuvidas.numeroReproducoes"]}}}},
+        {"$project":{"_id":0,"tempoTotalMS":1,"total_segundos":{"$divide":["$tempoTotalMS",1000]}}}
+    ]
+
+    df = run_query("usuario","aggregate", pipeline)
+
+
+    # Tratamento de erro / vazio
+    if df.empty or "total_segundos" not in df.columns:
+        return 0
+
+    # Retorna o valor inteiro (convertendo de float se necessário)
+    return int(df.iloc[0]['total_segundos'])
