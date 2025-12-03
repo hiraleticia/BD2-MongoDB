@@ -1,0 +1,10 @@
+[33m4f40d4a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mqueries_let[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{0}: pull origin main: Fast-forward
+[33m852bf4f[m HEAD@{1}: checkout: moving from main to queries_let
+[33m4f40d4a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mqueries_let[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{2}: commit: reorganizado plot_querys.py
+[33m852bf4f[m HEAD@{3}: checkout: moving from queries_let to main
+[33m852bf4f[m HEAD@{4}: checkout: moving from main to queries_let
+[33m852bf4f[m HEAD@{5}: pull origin main: Fast-forward
+[33m73e23ae[m HEAD@{6}: checkout: moving from conexao-mongodb to main
+[33mf8b0761[m[33m ([m[1;31morigin/conexao-mongodb[m[33m)[m HEAD@{7}: commit: conexao com mongodb e verificacao de login alterada
+[33m73e23ae[m HEAD@{8}: checkout: moving from main to conexao-mongodb
+[33m73e23ae[m HEAD@{9}: clone: from https://github.com/hiraleticia/BD2-MongoDB.git

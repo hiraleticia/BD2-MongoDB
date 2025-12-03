@@ -8,15 +8,24 @@ import queries as q
 #--------------------GERAL-------------------
 #--------------------------------------------
 def plot_total_musicas():
-    return
+    df_total_musicas = q.get_total_musicas_geral_count()
+    total_musicas = df_total_musicas.iloc[0]['total'] if not df_total_musicas.empty else 0
+    st.metric("🎵 Total de músicas", total_musicas)
+
 def plot_total_artistas():
-    return
+    df_total_artistas = q.get_total_artistas_geral_count()
+    total_artistas = df_total_artistas.iloc[0]['total'] if not df_total_artistas.empty else 0
+    st.metric("👥 Total de artistas", total_artistas)
 
 def plot_total_album():
-    return
+    df_total_album = q.get_total_album_geral_count()
+    total_album = df_total_album.iloc[0]['total'] if not df_total_album.empty else 0
+    st.metric("📀 Total de álbuns", total_album)
 
 def plot_total_podcast():
-    return
+    df_total_podcast = q.get_total_podcasts_geral_count()
+    total_podcast = df_total_podcast.iloc[0]['total'] if not df_total_podcast.empty else 0
+    st.metric("🎙️ Total de podcasts", total_podcast)
 
 def plot_top5_musicas_geral():
     return

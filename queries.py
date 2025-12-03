@@ -81,12 +81,15 @@ def get_song_plays_by_album(id_album):
 # ------------ TAB GERAL --------------
 
 def get_total_musicas_geral_count():
-    return run_query()
-
+    pipeline = [
+        {"$project": {"qtdMusicas": {"$size": "$musicas"}}},
+        {"$group": {"_id": "null", "total": {"$sum": "$qtdMusicas"}}},
+        {"$project": {"_id": 0, "total": 1}}
+    ]
+    return run_query("album", "aggregate", pipeline)
 
 def get_total_artistas_geral_count():
-
-    return run_query("album", "count_documents")
+    return run_query("album", "count_documents",{})
 
 def get_total_album_geral_count():
    
